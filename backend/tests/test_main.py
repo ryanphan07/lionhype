@@ -49,11 +49,10 @@ def test_extract_frames_returns_timestamped_payload(monkeypatch, frame_interval_
     assert extracted
     assert all({"timestamp", "image_data"}.issubset(item) for item in extracted)
     assert extracted[0]["timestamp"] == 0.0
-    assert isinstance(extracted[0]["image_data"], str)
+    assert isinstance(extracted[0]["image_data"], bytes)
     assert base64.b64decode(extracted[0]["image_data"])
 
 
-@pytest.mark.asyncio
 async def test_process_video_commentary_maps_audio_to_quips(monkeypatch):
     monkeypatch.setattr(commentary_module.video_processor_service, "extract_frames", lambda _: [
         {"timestamp": 0.0, "image_data": "abc"},

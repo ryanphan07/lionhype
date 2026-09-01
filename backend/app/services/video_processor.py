@@ -32,7 +32,7 @@ def extract_frames(video_path: str, frame_interval_sec: float = 1.0) -> List[Dic
                     frame_index += 1
                     continue
 
-                image_data = base64.b64encode(encoded.tobytes()).decode("utf-8")
+                image_data = encoded.tobytes()
                 frames.append({
                     "timestamp": round(timestamp, 2),
                     "image_data": image_data,
