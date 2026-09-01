@@ -59,3 +59,31 @@ async def process_video(video_path: str, frame_dir: str, sample_interval_sec: in
         frame_paths.append(image_path)
 
     return frame_paths
+import cv2
+from typing import List, Dict, Any
+
+def extract_frames(video_path: str, frame_interval_sec: float = 1.0) -> List[Dict[str, Any]]:
+    frames = []
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise ValueError("Error opening video file")
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    frame_interval = int(fps * frame_interval_sec)
+    frame_count = 0
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        if frame_count % frame_interval == 0:
+            # Resize frame to standard inference dimensions (e.g., 224x224)
+            resized_frame = cv2.resize(frame, (224, 224))
+            timestamp = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+            frames.append({"timestamp": timestamp, "image_data": resized_frame})
+
+        frame_count += 1
+
+    cap.release()
+    return frames
