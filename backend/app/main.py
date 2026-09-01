@@ -1,39 +1,52 @@
-from fastapi import FastAPI, UploadFile, File
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-import shutil
 import os
-
-from app.schemas.events import EventTimeline, PerformanceEvent, CommentaryResponse
+import uuid
+import shutil
+from fastapi import FastAPI, File, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+from typing import List
 from app.services.llm import generate_commentary
+from app.services.video_processor import process_video
+from app.services.commentary import generate_video_commentary
+from app.schemas.events import CommentaryResponse, CommentaryQuip
 
-app = FastAPI(title="LionHype API")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-os.makedirs("uploads", exist_ok=True)
-app.mount("/video_files", StaticFiles(directory="uploads"), name="uploads")
+app = FastAPI()
 
 @app.post("/api/upload")
 async def upload_video(file: UploadFile = File(...)):
-    file_path = f"uploads/{file.filename}"
-    with open(file_path, "wb") as buffer:
+    video_id = str(uuid.uuid4())
+    upload_dir = os.path.join("backend", "uploads")
+    video_path = os.path.join(upload_dir, file.filename)
+    frame_dir = os.path.join(upload_dir, "frames", video_id)
+
+    if not os.path.exists(upload_dir):
+        os.makedirs(upload_dir)
+    if not os.path.exists(frame_dir):
+        os.makedirs(frame_dir)
+
+    with open(video_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-    return {"filename": file.filename, "url": f"/video_files/{file.filename}"}
+
+    frame_paths = await process_video(video_path, frame_dir, sample_interval_sec=2)
+
+    return JSONResponse(content={"video_id": video_id, "frame_paths": frame_paths})
+
+@app.websocket("/ws/analyze")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # Handle the received data
+            await websocket.send_text(f"Message text was: {data}")
+    except WebSocketDisconnect:
+        await websocket.close()
 
 @app.post("/api/commentary/mock", response_model=CommentaryResponse)
 async def get_mock_commentary():
-    mock_timeline = EventTimeline(
-        performance_id="lion_01",
-        timeline=[
-            PerformanceEvent(timestamp_ms=2500, events=["crouch", "drum_roll"]),
-            PerformanceEvent(timestamp_ms=5100, events=["high_pole_jump", "cymbal_crash", "crowd_cheer"]),
-            PerformanceEvent(timestamp_ms=8300, events=["head_shake", "gong_hit"])
-        ]
-    )
-    return await generate_commentary(mock_timeline)
+    # Mock implementation
+    return CommentaryResponse(quips=[CommentaryQuip(text="Mock commentary")])
+
+@app.post("/api/commentary/generate", response_model=CommentaryResponse)
+async def generate_commentary_endpoint(video_id: str):
+    return await generate_video_commentary(video_id)

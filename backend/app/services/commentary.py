@@ -37,6 +37,7 @@ async def generate_video_commentary(video_id: str) -> CommentaryResponse:
     commentary_quips = []
 
     async with httpx.AsyncClient(timeout=60.0) as client:
+        tasks = []
         for frame_file in frame_files:
             if not frame_file.endswith((".jpg", ".png", ".jpeg")):
                 continue
@@ -75,23 +76,22 @@ async def generate_video_commentary(video_id: str) -> CommentaryResponse:
                 "temperature": 0.7
             }
 
-            try:
-                response = await client.post("http://127.0.0.1:8080/v1/chat/completions", json=payload)
+            tasks.append(client.post("http://127.0.0.1:8080/v1/chat/completions", json=payload))
+
+        responses = await asyncio.gather(*tasks)
+
+        for response in responses:
+            if response.status_code == 200:
+                data = response.json()
+                content = data["choices"][0]["message"]["content"].strip()
                 
-                if response.status_code == 200:
-                    data = response.json()
-                    content = data["choices"][0]["message"]["content"].strip()
-                    
-                    # If model wraps response in Markdown codeblocks, strip them
-                    if content.startswith("```"):
-                        content = content.replace("```json", "").replace("```", "").strip()
+                # If model wraps response in Markdown codeblocks, strip them
+                if content.startswith("```"):
+                    content = content.replace("```json", "").replace("```", "").strip()
 
-                    commentary_quips.append(CommentaryQuip(timestamp=timestamp, text=content))
-                else:
-                    print(f"Server error for {frame_file}: {response.status_code} - {response.text}")
-
-            except Exception as e:
-                print(f"Failed to process frame {frame_file}: {e}")
+                commentary_quips.append(CommentaryQuip(timestamp=timestamp, text=content))
+            else:
+                print(f"Server error: {response.status_code} - {response.text}")
 
     # Generate audio commentary
     audio_commentary = await generate_audio_commentary(video_id, [{"timestamp": quip.timestamp, "text": quip.text} for quip in commentary_quips])
