@@ -15,7 +15,8 @@ app = FastAPI()
 @app.post("/api/upload")
 async def upload_video(file: UploadFile = File(...)):
     video_id = str(uuid.uuid4())
-    upload_dir = os.path.join("backend", "uploads")
+    base_dir = os.path.abspath(os.path.dirname(__file__))
+    upload_dir = os.path.join(base_dir, "..", "uploads")
     video_path = os.path.join(upload_dir, file.filename)
     frame_dir = os.path.join(upload_dir, "frames", video_id)
 

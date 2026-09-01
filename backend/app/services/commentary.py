@@ -29,10 +29,11 @@ def encode_image_to_base64(image_path: str) -> str:
 
 async def generate_video_commentary(video_id: str) -> CommentaryResponse:
     # Ensure correct local pathing relative to execution directory
-    frame_dir = os.path.join("uploads", "frames", video_id)
+    base_dir = os.path.abspath(os.path.dirname(__file__))
+    frame_dir = os.path.join(base_dir, "..", "uploads", "frames", video_id)
     if not os.path.exists(frame_dir):
         # Fallback if executed from outside backend/
-        frame_dir = os.path.join("backend", "uploads", "frames", video_id)
+        frame_dir = os.path.join(base_dir, "..", "..", "uploads", "frames", video_id)
 
     frame_files = sorted(os.listdir(frame_dir))
     commentary_quips = []

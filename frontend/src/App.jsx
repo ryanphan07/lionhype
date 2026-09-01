@@ -12,7 +12,11 @@ function App() {
     const fetchCommentary = async () => {
       try {
         const response = await axios.get('http://127.0.0.1:8000/api/commentary/mock');
-        setCommentaryQuips(response.data.quips);
+        if (response.status === 200) {
+          setCommentaryQuips(response.data.quips);
+        } else {
+          console.error('Error fetching commentary:', response.statusText);
+        }
       } catch (error) {
         console.error('Error fetching commentary:', error);
       }
@@ -32,8 +36,12 @@ function App() {
           'Content-Type': 'multipart/form-data',
         },
       });
-      setVideoId(response.data.video_id);
-      setVideoUrl(URL.createObjectURL(file));
+      if (response.status === 200) {
+        setVideoId(response.data.video_id);
+        setVideoUrl(URL.createObjectURL(file));
+      } else {
+        console.error('Error uploading video:', response.statusText);
+      }
     } catch (error) {
       console.error('Error uploading video:', error);
     }
