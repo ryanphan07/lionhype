@@ -4,6 +4,7 @@ import json
 import httpx
 from typing import List
 from app.schemas.events import CommentaryQuip, CommentaryResponse
+from app.services.tts import generate_audio_commentary
 
 COMMENTARY_SYSTEM_PROMPT = """
 You are an unhinged, high-energy, deeply sarcastic sports commentator roasting amateur athlete practice footage.
@@ -92,4 +93,16 @@ async def generate_video_commentary(video_id: str) -> CommentaryResponse:
             except Exception as e:
                 print(f"Failed to process frame {frame_file}: {e}")
 
-    return CommentaryResponse(quips=commentary_quips)
+    # Generate audio commentary
+    audio_commentary = await generate_audio_commentary(video_id, [{"timestamp": quip.timestamp, "text": quip.text} for quip in commentary_quips])
+
+    # Combine commentary and audio data
+    combined_commentary = []
+    for quip, audio in zip(commentary_quips, audio_commentary):
+        combined_commentary.append({
+            "timestamp": quip.timestamp,
+            "text": quip.text,
+            "audio_url": audio["audio_url"]
+        })
+
+    return CommentaryResponse(quips=combined_commentary)

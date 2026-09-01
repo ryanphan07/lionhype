@@ -1,18 +1,6 @@
 fastapi
 uvicorn
-ollama
-opencv-python
-numpy
-mcp
-librosa
-python-multipart
-itertools
-anyio
 pydantic
-pydantic_settings
-uvloop
-```
-# Development and tools
-python-dotenv
-pytest
-```
+opencv-python
+httpx
+edge-tts

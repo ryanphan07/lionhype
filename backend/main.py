@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from typing import List
 from app.services.llm import generate_commentary
 from app.services.video_processor import process_video
+from app.services.commentary import generate_video_commentary
 from app.schemas.events import CommentaryResponse, CommentaryQuip
 
 app = FastAPI()
@@ -45,3 +46,7 @@ async def websocket_endpoint(websocket: WebSocket):
 async def get_mock_commentary():
     # Mock implementation
     return CommentaryResponse(quips=[CommentaryQuip(text="Mock commentary")])
+
+@app.post("/api/commentary/generate", response_model=CommentaryResponse)
+async def generate_commentary_endpoint(video_id: str):
+    return await generate_video_commentary(video_id)
