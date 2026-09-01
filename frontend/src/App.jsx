@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { GiVideo, MessageSquare } from 'lucide-react';
 import axios from 'axios';
+import VideoPlayer from './components/VideoPlayer';
 
 function App() {
   const [count, setCount] = useState(0);
   const [commentaryQuips, setCommentaryQuips] = useState([]);
+  const [videoUrl, setVideoUrl] = useState(null);
+  const [videoId, setVideoId] = useState(null);
 
   useEffect(() => {
     const fetchCommentary = async () => {
@@ -19,34 +21,46 @@ function App() {
     fetchCommentary();
   }, []);
 
+  const handleVideoUpload = async (event) => {
+    const file = event.target.files[0];
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await axios.post('http://127.0.0.1:8000/api/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      setVideoId(response.data.video_id);
+      setVideoUrl(URL.createObjectURL(file));
+    } catch (error) {
+      console.error('Error uploading video:', error);
+    }
+  };
+
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div className="dashboard">
-          <div className="video-upload-card">
-            <GiVideo size={48} />
-            <h3>Upload Video</h3>
-            <input type="file" />
+    <div className="App">
+      <header className="App-header">
+        <h1>Video Commentary App</h1>
+        <input type="file" accept="video/*" onChange={handleVideoUpload} />
+        {videoUrl && (
+          <div>
+            <VideoPlayer videoUrl={videoUrl} commentaryQuips={commentaryQuips} />
           </div>
-          <div className="commentary-timeline">
-            <h3>Commentary Timeline</h3>
-            <ul>
-              {commentaryQuips.map((quip, index) => (
-                <li key={index}>
-                  <MessageSquare size={24} />
-                  {quip.text}
-                </li>
-              ))}
-            </ul>
-          </div>
+        )}
+        <div className="commentary-sidebar">
+          <h2>Commentary</h2>
+          <ul>
+            {commentaryQuips.map((quip, index) => (
+              <li key={index}>
+                <strong>{quip.timestamp}s:</strong> {quip.text}
+              </li>
+            ))}
+          </ul>
         </div>
-      </section>
-    </>
+      </header>
+    </div>
   );
 }
 
