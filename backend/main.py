@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from typing import List
 from app.services.llm import generate_commentary
 from app.services.video_processor import process_video
+from app.schemas.events import CommentaryResponse, CommentaryQuip
 
 app = FastAPI()
 
