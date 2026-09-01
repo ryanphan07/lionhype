@@ -2,6 +2,7 @@ import os
 import base64
 import json
 import httpx
+import asyncio
 from typing import List
 from app.schemas.events import CommentaryQuip, CommentaryResponse
 from app.services.tts import generate_audio_commentary
