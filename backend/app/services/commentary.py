@@ -27,7 +27,10 @@ async def generate_video_commentary(video_id: str) -> CommentaryResponse:
             if response.status_code == 200:
                 try:
                     response_data = response.json()
-                    timestamp = float(frame_file.split("_")[1].split(".")[0]) / cap.get(cv2.CAP_PROP_FPS)
+                    # Extract the frame count from the filename
+                    frame_count = int(frame_file.split("_")[1].split(".")[0])
+                    # Calculate the timestamp based on the frame count and sample interval
+                    timestamp = frame_count * 2  # Assuming 2 seconds per frame
                     text = response_data.get("text", "")
                     commentary_quips.append(CommentaryQuip(timestamp=timestamp, text=text))
                 except Exception as e:
