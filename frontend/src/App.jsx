@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GiVideo, GiComment } from 'lucide-react';
+import { GiVideo, MessageSquare } from 'lucide-react';
 import axios from 'axios';
 
 function App() {
@@ -38,7 +38,7 @@ function App() {
             <ul>
               {commentaryQuips.map((quip, index) => (
                 <li key={index}>
-                  <GiComment size={24} />
+                  <MessageSquare size={24} />
                   {quip.text}
                 </li>
               ))}
