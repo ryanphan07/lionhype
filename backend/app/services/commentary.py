@@ -1,110 +1,61 @@
-import os
-import base64
-import json
-import httpx
 import asyncio
-from typing import List
+from typing import Any, Dict, List
+
 from app.schemas.events import CommentaryQuip, CommentaryResponse
-from app.services.tts import generate_audio_commentary
+from app.services import llm as llm_service
+from app.services import tts as tts_service
+from app.services import video_processor as video_processor_service
 
-COMMENTARY_SYSTEM_PROMPT = """
-You are an unhinged, high-energy, deeply sarcastic sports commentator roasting amateur athlete practice footage.
-Your job is to analyze video keyframes and call out bad form, exaggerated effort, and mid-play hesitation.
 
-Tone requirements:
-- Sarcasm level: 80% (cutting, witty observations about athletic failure)
-- Energy level: 10% (bursts of screaming hype man energy)
-- Chaos level: 10% (bizarre analogies and dramatic overreactions)
+def _normalize_quip(quip: Dict[str, Any]) -> Dict[str, Any]:
+    timestamp = quip.get("timestamp")
+    if timestamp is None and "timestamp_ms" in quip:
+        timestamp = float(quip["timestamp_ms"]) / 1000.0
+    if timestamp is None:
+        timestamp = 0.0
+    return {
+        "timestamp": float(timestamp),
+        "text": quip.get("text") or quip.get("commentary") or "",
+    }
 
-Return strictly valid JSON formatted as a list of objects containing timestamp (in seconds) and text quips:
-[
-  {"timestamp": 2.0, "text": "Observe the absolute peak athletic performance of missing a stationary target."}
-]
-"""
 
-def encode_image_to_base64(image_path: str) -> str:
-    """Helper function to encode a frame image to base64 format."""
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode("utf-8")
+async def process_video_commentary(video_path: str) -> CommentaryResponse:
+    frames = await asyncio.to_thread(video_processor_service.extract_frames, video_path)
+    event_timeline = await llm_service.generate_event_timeline(frames)
+
+    if not event_timeline:
+        return CommentaryResponse(quips=[])
+
+    normalized_quips = [_normalize_quip(quip) for quip in event_timeline]
+    audio_tasks = [tts_service.generate_audio_clip(quip, video_id="default") for quip in normalized_quips]
+    synthesized_audio = await asyncio.gather(*audio_tasks)
+
+    quips: List[CommentaryQuip] = []
+    for index, quip in enumerate(normalized_quips):
+        audio_data = synthesized_audio[index]
+        quip_payload = dict(quip)
+        quip_payload["audio_url"] = audio_data["audio_url"]
+        quips.append(CommentaryQuip(**quip_payload))
+
+    return CommentaryResponse(quips=quips)
+
 
 async def generate_video_commentary(video_id: str) -> CommentaryResponse:
-    # Ensure correct local pathing relative to execution directory
-    base_dir = os.path.abspath(os.path.dirname(__file__))
-    frame_dir = os.path.join(base_dir, "..", "uploads", "frames", video_id)
-    if not os.path.exists(frame_dir):
-        # Fallback if executed from outside backend/
-        frame_dir = os.path.join(base_dir, "..", "..", "uploads", "frames", video_id)
+    """Backward-compatible wrapper for the older video-id-based API."""
+    from pathlib import Path
 
-    frame_files = sorted(os.listdir(frame_dir))
-    commentary_quips = []
+    candidate_paths = [
+        Path("backend/uploads/frames") / video_id,
+        Path("uploads/frames") / video_id,
+        Path("backend") / "uploads" / "frames" / video_id,
+    ]
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        tasks = []
-        for frame_file in frame_files:
-            if not frame_file.endswith((".jpg", ".png", ".jpeg")):
-                continue
+    for frame_dir in candidate_paths:
+        if frame_dir.exists():
+            frame_paths = sorted(frame_dir.glob("*.jpg"))
+            frames = []
+            for frame_path in frame_paths:
+                frames.append({"timestamp": float(frame_path.stem.split("_")[-1]) if frame_path.stem.split("_")[-1].replace(".", "", 1).isdigit() else 0.0, "image_data": ""})
+            return await process_video_commentary(str(frame_dir.parent / "video.mp4"))
 
-            frame_path = os.path.join(frame_dir, frame_file)
-            base64_image = encode_image_to_base64(frame_path)
-
-            # Calculate timestamp assuming file naming convention: frame_0.jpg, frame_1.jpg...
-            try:
-                frame_index = int(frame_file.split("_")[1].split(".")[0])
-                timestamp = float(frame_index * 2)  # 2 seconds per frame interval
-            except Exception:
-                timestamp = 0.0
-
-            payload = {
-                "model": "qwen-coder",
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": COMMENTARY_SYSTEM_PROMPT
-                    },
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": f"Analyze this keyframe at timestamp {timestamp} seconds and provide a short sarcastic roast line."},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{base64_image}"
-                                }
-                            }
-                        ]
-                    }
-                ],
-                "max_tokens": 150,
-                "temperature": 0.7
-            }
-
-            tasks.append(client.post("http://127.0.0.1:8080/v1/chat/completions", json=payload))
-
-        responses = await asyncio.gather(*tasks)
-
-        for response in responses:
-            if response.status_code == 200:
-                data = response.json()
-                content = data["choices"][0]["message"]["content"].strip()
-                
-                # If model wraps response in Markdown codeblocks, strip them
-                if content.startswith("```"):
-                    content = content.replace("```json", "").replace("```", "").strip()
-
-                commentary_quips.append(CommentaryQuip(timestamp=timestamp, text=content))
-            else:
-                print(f"Server error: {response.status_code} - {response.text}")
-
-    # Generate audio commentary
-    audio_commentary = await generate_audio_commentary(video_id, [{"timestamp": quip.timestamp, "text": quip.text} for quip in commentary_quips])
-
-    # Combine commentary and audio data
-    combined_commentary = []
-    for quip, audio in zip(commentary_quips, audio_commentary):
-        combined_commentary.append({
-            "timestamp": quip.timestamp,
-            "text": quip.text,
-            "audio_url": audio["audio_url"]
-        })
-
-    return CommentaryResponse(quips=combined_commentary)
+    return CommentaryResponse(quips=[])

@@ -4,3 +4,8 @@ pydantic
 opencv-python
 httpx
 edge-tts
+openai
+python-multipart
+
+pytest
+pytest-asyncio

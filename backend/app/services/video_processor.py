@@ -1,25 +1,61 @@
+import base64
 import os
+from typing import Any, Dict, List
+
 import cv2
-from typing import List
+
+
+def extract_frames(video_path: str, frame_interval_sec: float = 1.0) -> List[Dict[str, Any]]:
+    """Sample a video into resized, base64-encoded JPEG payloads with timestamps."""
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        cap.release()
+        raise IOError(f"Could not open video file: {video_path}")
+
+    frames: List[Dict[str, Any]] = []
+    try:
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        fps = fps if fps and fps > 0 else 1.0
+        frame_stride = max(1, int(round(fps * frame_interval_sec)))
+        frame_index = 0
+        timestamp = 0.0
+
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            if frame_index % frame_stride == 0:
+                resized = cv2.resize(frame, (640, 360), interpolation=cv2.INTER_AREA)
+                success, encoded = cv2.imencode(".jpg", resized)
+                if not success:
+                    frame_index += 1
+                    continue
+
+                image_data = base64.b64encode(encoded.tobytes()).decode("utf-8")
+                frames.append({
+                    "timestamp": round(timestamp, 2),
+                    "image_data": image_data,
+                })
+
+            frame_index += 1
+            timestamp = frame_index / fps
+    finally:
+        cap.release()
+
+    return frames
+
 
 async def process_video(video_path: str, frame_dir: str, sample_interval_sec: int = 2) -> List[str]:
-    cap = cv2.VideoCapture(video_path)
-    frame_paths = []
-    frame_count = 0
-    sample_frame_count = sample_interval_sec * cap.get(cv2.CAP_PROP_FPS)
+    """Compatibility helper retained for existing upload flow."""
+    frames = extract_frames(video_path, frame_interval_sec=sample_interval_sec)
+    frame_paths: List[str] = []
+    os.makedirs(frame_dir, exist_ok=True)
 
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
+    for idx, frame in enumerate(frames):
+        image_path = os.path.join(frame_dir, f"frame_{idx}.jpg")
+        with open(image_path, "wb") as out_file:
+            out_file.write(base64.b64decode(frame["image_data"]))
+        frame_paths.append(image_path)
 
-        if frame_count % sample_frame_count == 0:
-            frame_filename = f"frame_{frame_count}.jpg"
-            frame_path = os.path.join(frame_dir, frame_filename)
-            cv2.imwrite(frame_path, frame)
-            frame_paths.append(frame_path)
-
-        frame_count += 1
-
-    cap.release()
     return frame_paths

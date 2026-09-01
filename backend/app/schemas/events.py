@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 class EventTimeline(BaseModel):
     events: List[dict]
@@ -7,6 +7,7 @@ class EventTimeline(BaseModel):
 class CommentaryQuip(BaseModel):
     timestamp: float
     text: str
+    audio_url: Optional[str] = None
 
 class CommentaryResponse(BaseModel):
     quips: List[CommentaryQuip]
