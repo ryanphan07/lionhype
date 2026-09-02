@@ -6,40 +6,33 @@ import cv2
 
 
 def extract_frames(video_path: str, frame_interval_sec: float = 1.0) -> List[Dict[str, Any]]:
-    """Sample a video into resized, base64-encoded JPEG payloads with timestamps."""
+    frames: List[Dict[str, Any]] = []
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        cap.release()
-        raise IOError(f"Could not open video file: {video_path}")
+        raise ValueError("Error opening video file")
 
-    frames: List[Dict[str, Any]] = []
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    frame_interval = max(1, int(fps * frame_interval_sec))
+    frame_count = 0
+
     try:
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        fps = fps if fps and fps > 0 else 1.0
-        frame_stride = max(1, int(round(fps * frame_interval_sec)))
-        frame_index = 0
-        timestamp = 0.0
-
         while True:
             ret, frame = cap.read()
             if not ret:
                 break
 
-            if frame_index % frame_stride == 0:
-                resized = cv2.resize(frame, (640, 360), interpolation=cv2.INTER_AREA)
-                success, encoded = cv2.imencode(".jpg", resized)
-                if not success:
-                    frame_index += 1
-                    continue
+            if frame_count % frame_interval == 0:
+                resized_frame = cv2.resize(frame, (224, 224))
+                success, encoded = cv2.imencode(".jpg", resized_frame)
+                if success:
+                    b64_str = base64.b64encode(encoded.tobytes()).decode("utf-8")
+                    timestamp = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+                    frames.append({
+                        "timestamp": round(timestamp, 2),
+                        "image_data": b64_str,
+                    })
 
-                image_data = encoded.tobytes()
-                frames.append({
-                    "timestamp": round(timestamp, 2),
-                    "image_data": image_data,
-                })
-
-            frame_index += 1
-            timestamp = frame_index / fps
+            frame_count += 1
     finally:
         cap.release()
 
@@ -59,31 +52,3 @@ async def process_video(video_path: str, frame_dir: str, sample_interval_sec: in
         frame_paths.append(image_path)
 
     return frame_paths
-import cv2
-from typing import List, Dict, Any
-
-def extract_frames(video_path: str, frame_interval_sec: float = 1.0) -> List[Dict[str, Any]]:
-    frames = []
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        raise ValueError("Error opening video file")
-
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    frame_interval = int(fps * frame_interval_sec)
-    frame_count = 0
-
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        if frame_count % frame_interval == 0:
-            # Resize frame to standard inference dimensions (e.g., 224x224)
-            resized_frame = cv2.resize(frame, (224, 224))
-            timestamp = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
-            frames.append({"timestamp": timestamp, "image_data": resized_frame})
-
-        frame_count += 1
-
-    cap.release()
-    return frames
