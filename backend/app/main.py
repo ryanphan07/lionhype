@@ -4,6 +4,7 @@ import shutil
 import uuid
 
 from fastapi import FastAPI, File, UploadFile, WebSocket, WebSocketDisconnect
+from app.services.video_processor import validate_upload_metadata, sanitize_filename, is_video_corrupt
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -29,13 +30,21 @@ async def upload_video(file: UploadFile = File(...)):
     upload_dir = os.path.join(base_dir, "..", "uploads")
     os.makedirs(upload_dir, exist_ok=True)
 
-    safe_name = os.path.basename(file.filename or f"upload_{video_id}.mp4")
+    # Sanitize filename
+    safe_name = sanitize_filename(file.filename or f"upload_{video_id}.mp4")
     video_path = os.path.join(upload_dir, safe_name)
     frame_dir = os.path.join(upload_dir, "frames", video_id)
     os.makedirs(frame_dir, exist_ok=True)
 
+    # Validate file
+    validate_upload_metadata(file.filename, file.file.tell())
+
     with open(video_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
+
+    # Check for file corruption
+    if is_video_corrupt(video_path):
+        return JSONResponse(status_code=400, content={"detail": "The uploaded video file is corrupt."})
 
     frame_paths = await process_video(video_path, frame_dir, sample_interval_sec=2)
     return JSONResponse(content={"video_id": video_id, "video_path": video_path, "frame_paths": frame_paths})
