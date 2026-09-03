@@ -60,10 +60,10 @@ def is_video_corrupt(file_path: str) -> bool:
     if not ret or frame is None or frame.size == 0 or frame_count <= 0:
         return True
 
-    return False
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     frame_interval = max(1, int(fps * frame_interval_sec))
     frame_count = 0
+    frames: List[Dict[str, Any]] = []
 
     try:
         while True:
