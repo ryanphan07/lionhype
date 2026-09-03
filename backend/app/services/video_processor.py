@@ -86,7 +86,7 @@ def is_video_corrupt(file_path: str) -> bool:
     finally:
         cap.release()
 
-    return frames
+    return frames if frames else None
 
 
 async def process_video(video_path: str, frame_dir: str, sample_interval_sec: int = 2) -> List[str]:
