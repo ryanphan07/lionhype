@@ -3,7 +3,7 @@ import os
 import shutil
 import uuid
 
-from fastapi import FastAPI, File, UploadFile, WebSocket, WebSocketDisconnect, HTTPException, Request
+from fastapi import FastAPI, File, UploadFile, WebSocket, WebSocketDisconnect, HTTPException, Request, BackgroundTasks
 from pydantic import BaseModel
 import boto3
 from botocore.exceptions import NoCredentialsError
@@ -77,7 +77,7 @@ async def get_presigned_url(request: PresignedUrlRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.websocket("/ws/analyze")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(websocket: WebSocket, job_id: str):
     await websocket.accept()
     try:
         while True:
@@ -112,7 +112,20 @@ async def get_mock_commentary(payload: dict | None = None):
 
 
 @app.post("/api/commentary/generate", response_model=CommentaryResponse)
-async def generate_commentary_endpoint(video_url: str):
-    # Implement logic to process the video from the S3 URL
-    # For now, return a mock response
-    return CommentaryResponse(quips=[], video_url=video_url)
+async def generate_commentary_endpoint(video_url: str, background_tasks: BackgroundTasks):
+    job_id = str(uuid.uuid4())
+    job_tracker[job_id] = {"status": "pending", "video_url": video_url}
+    background_tasks.add_task(process_commentary_background, job_id, video_url)
+    return JSONResponse(content={"job_id": job_id}, status_code=202)
+# Job tracking dictionary
+job_tracker = {}
+
+async def process_commentary_background(job_id: str, video_url: str):
+    try:
+        job_tracker[job_id]["status"] = "processing"
+        commentary = await generate_video_commentary(video_url)
+        job_tracker[job_id]["status"] = "completed"
+        job_tracker[job_id]["commentary"] = commentary
+    except Exception as exc:
+        job_tracker[job_id]["status"] = "error"
+        job_tracker[job_id]["error"] = str(exc)
