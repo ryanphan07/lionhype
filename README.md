@@ -33,6 +33,14 @@ Features in place:
 
 This is the critical “raw media to model-ready payload” component.
 
+#### Validation & Security helpers
+`backend/app/services/video_processor.py` includes utility functions for input validation and integrity checks:
+- `sanitize_filename()` to prevent path traversal attacks
+- `validate_upload_metadata()` to enforce allowed file extensions and size limits
+- `is_video_corrupt()` to verify video container integrity using OpenCV
+
+These helpers are ready for integration into the upload pipeline.
+
 #### Commentary orchestration
 `backend/app/services/commentary.py` implements the async commentary pipeline.
 
@@ -65,6 +73,15 @@ Features in place:
 - Output path in the backend upload/audio folder
 - URL generation for playback from the app server
 - Fallback behavior if TTS dependency is missing
+
+#### MCP Soundboard Server
+`backend/mcp_server.py` implements a FastMCP server for LLM-driven sound effects.
+
+Features in place:
+- Exposes a `trigger_sfx` tool to LLM agents
+- Supports effects like gong, cymbals, airhorn, and drumroll
+- Returns structured event strings for timestamp synchronization
+- Designed to integrate with the commentary pipeline for dynamic audio cues
 
 #### FastAPI app and websocket flow
 `backend/app/main.py` implements the API and real-time processing flow.
@@ -141,8 +158,8 @@ The repo is not yet production-grade. The current state is best described as a w
 
 ### 1. Production hardening
 Missing or incomplete areas include:
+- integration of existing validation helpers (`validate_upload_metadata`, `is_video_corrupt`) into the `/api/upload` route
 - stronger input validation for uploaded files
-- file-type and corruption checks
 - safe handling of missing or invalid videos
 - more robust logging and monitoring
 - deployment packaging and environment configuration
