@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.schemas.events import CommentaryResponse
-from app.services.commentary import process_video_commentary
+from app.services.commentary import process_video_commentary, generate_video_commentary
 from app.services.video_processor import process_video
 
 app = FastAPI()
