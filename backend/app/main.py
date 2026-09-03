@@ -53,6 +53,29 @@ async def upload_video(file: UploadFile = File(...)):
     return JSONResponse(content={"video_id": video_id, "video_path": video_path, "frame_paths": frame_paths})
 
 
+class PresignedUrlRequest(BaseModel):
+    filename: str
+    content_type: str
+
+@app.post("/api/upload/presigned-url")
+async def get_presigned_url(request: PresignedUrlRequest):
+    filename = request.filename
+    content_type = request.content_type
+
+    try:
+        s3_client = boto3.client('s3')
+        bucket_name = 'your-bucket-name'  # Replace with your S3 bucket name
+        presigned_url = s3_client.generate_presigned_url(
+            'put_object',
+            Params={'Bucket': bucket_name, 'Key': filename, 'ContentType': content_type},
+            ExpiresIn=3600  # URL expires in 1 hour
+        )
+        return {"presigned_url": presigned_url}
+    except NoCredentialsError:
+        raise HTTPException(status_code=400, detail="AWS credentials not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.websocket("/ws/analyze")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
