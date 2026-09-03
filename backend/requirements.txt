@@ -6,6 +6,7 @@ httpx
 edge-tts
 openai
 python-multipart
+boto3
 
 pytest
 pytest-asyncio

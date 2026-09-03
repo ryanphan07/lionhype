@@ -11,3 +11,4 @@ class CommentaryQuip(BaseModel):
 
 class CommentaryResponse(BaseModel):
     quips: List[CommentaryQuip]
+    video_url: Optional[str] = None  # Add this line

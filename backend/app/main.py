@@ -3,7 +3,10 @@ import os
 import shutil
 import uuid
 
-from fastapi import FastAPI, File, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, File, UploadFile, WebSocket, WebSocketDisconnect, HTTPException, Request
+from pydantic import BaseModel
+import boto3
+from botocore.exceptions import NoCredentialsError
 from app.services.video_processor import validate_upload_metadata, sanitize_filename, is_video_corrupt
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -86,5 +89,7 @@ async def get_mock_commentary(payload: dict | None = None):
 
 
 @app.post("/api/commentary/generate", response_model=CommentaryResponse)
-async def generate_commentary_endpoint(video_path: str):
-    return await process_video_commentary(video_path)
+async def generate_commentary_endpoint(video_url: str):
+    # Implement logic to process the video from the S3 URL
+    # For now, return a mock response
+    return CommentaryResponse(quips=[], video_url=video_url)
