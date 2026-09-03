@@ -39,18 +39,32 @@ async def upload_video(file: UploadFile = File(...)):
     frame_dir = os.path.join(upload_dir, "frames", video_id)
     os.makedirs(frame_dir, exist_ok=True)
 
-    # Validate file
-    validate_upload_metadata(file.filename, file.file.tell())
+    try:
+        # Validate file extension and size before writing
+        file_size = file.size
+        if file_size is None:
+            file.file.seek(0, 2)
+            file_size = file.file.tell()
+            file.file.seek(0)
+        validate_upload_metadata(file.filename, file_size)
 
-    with open(video_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        with open(video_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-    # Check for file corruption
-    if is_video_corrupt(video_path):
-        return JSONResponse(status_code=400, content={"detail": "The uploaded video file is corrupt."})
+        # Check for file corruption
+        if is_video_corrupt(video_path):
+            os.remove(video_path)
+            raise HTTPException(status_code=400, detail="The uploaded video file is corrupt.")
 
-    frame_paths = await process_video(video_path, frame_dir, sample_interval_sec=2)
-    return JSONResponse(content={"video_id": video_id, "video_path": video_path, "frame_paths": frame_paths})
+        frame_paths = await process_video(video_path, frame_dir, sample_interval_sec=2)
+        return JSONResponse(content={"video_id": video_id, "video_path": video_path, "frame_paths": frame_paths})
+    except Exception as e:
+        # Clean up uploaded files on failure
+        if os.path.exists(video_path):
+            os.remove(video_path)
+        if os.path.exists(frame_dir):
+            shutil.rmtree(frame_dir)
+        raise e
 
 
 class PresignedUrlRequest(BaseModel):
