@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import VideoPlayer from './components/VideoPlayer';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 function App() {
   const [commentaryQuips, setCommentaryQuips] = useState([]);
@@ -8,6 +10,7 @@ function App() {
   const [processingStatus, setProcessingStatus] = useState('idle');
   const [progress, setProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
+  const [pipelineStage, setPipelineStage] = useState('');
   const socketRef = useRef(null);
 
   useEffect(() => {
@@ -37,6 +40,7 @@ function App() {
       if (msg.status === 'processing') {
         setProcessingStatus(msg.message);
         setProgress(msg.progress || 0);
+        setPipelineStage(msg.message);
         return;
       }
 
@@ -44,6 +48,7 @@ function App() {
         setProcessingStatus('completed');
         setProgress(100);
         setCommentaryQuips(Array.isArray(msg.quips) ? msg.quips : []);
+        setPipelineStage('completed');
         return;
       }
 
@@ -51,17 +56,26 @@ function App() {
         setProcessingStatus('error');
         setProgress(100);
         setErrorMessage(msg.message || 'Video analysis failed.');
+        setPipelineStage('error');
+        toast.error(msg.message || 'Video analysis failed.', {
+          position: toast.POSITION.TOP_RIGHT,
+        });
       }
     };
 
     socket.onerror = () => {
       setProcessingStatus('error');
       setErrorMessage('Unable to connect to the analysis WebSocket.');
+      setPipelineStage('error');
+      toast.error('Unable to connect to the analysis WebSocket.', {
+        position: toast.POSITION.TOP_RIGHT,
+      });
     };
 
     socket.onclose = () => {
       if (processingStatus !== 'completed' && processingStatus !== 'error') {
         setProcessingStatus('idle');
+        setPipelineStage('');
       }
     };
   };
@@ -125,6 +139,12 @@ function App() {
           </div>
         )}
 
+        {pipelineStage && (
+          <div style={{ margin: '1rem 0' }}>
+            <strong>Stage:</strong> {pipelineStage}
+          </div>
+        )}
+
         {errorMessage && (
           <div role="alert" style={{ background: '#fff1f0', color: '#a61d24', padding: '0.75rem', borderRadius: '6px', marginBottom: '1rem' }}>
             {errorMessage}
@@ -137,6 +157,7 @@ function App() {
           </div>
         )}
       </header>
+      <ToastContainer />
     </div>
   );
 }
