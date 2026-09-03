@@ -36,15 +36,17 @@ function App() {
 
     socket.onmessage = (event) => {
       const msg = JSON.parse(event.data);
+      const status = msg.status || msg.phase || msg.message;
+      const progressVal = msg.progress ?? 0;
 
-      if (msg.status === 'processing') {
-        setProcessingStatus(msg.message);
-        setProgress(msg.progress || 0);
-        setPipelineStage(msg.message);
+      if (['uploading', 'extracting', 'analyzing', 'synthesizing'].includes(status)) {
+        setProcessingStatus(status);
+        setProgress(progressVal);
+        setPipelineStage(status);
         return;
       }
 
-      if (msg.status === 'completed') {
+      if (status === 'completed') {
         setProcessingStatus('completed');
         setProgress(100);
         setCommentaryQuips(Array.isArray(msg.quips) ? msg.quips : []);
@@ -52,7 +54,7 @@ function App() {
         return;
       }
 
-      if (msg.status === 'error') {
+      if (status === 'error') {
         setProcessingStatus('error');
         setProgress(100);
         setErrorMessage(msg.message || 'Video analysis failed.');
@@ -131,11 +133,20 @@ function App() {
 
         {processingStatus !== 'idle' && (
           <div style={{ margin: '1rem 0' }}>
-            <strong>Status:</strong> {processingStatus}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+              <div style={{
+                width: '16px', height: '16px',
+                border: '2px solid #f3f3f3', borderTop: '2px solid #4caf50',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite'
+              }} />
+              <strong>Status:</strong> {processingStatus}
+            </div>
             <div style={{ width: '100%', maxWidth: '360px', background: '#eee', borderRadius: '4px', overflow: 'hidden' }}>
               <div style={{ width: `${progress}%`, background: '#4caf50', height: '8px' }} />
             </div>
             {progress > 0 && <small>{progress}%</small>}
+            <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
           </div>
         )}
 
@@ -146,8 +157,9 @@ function App() {
         )}
 
         {errorMessage && (
-          <div role="alert" style={{ background: '#fff1f0', color: '#a61d24', padding: '0.75rem', borderRadius: '6px', marginBottom: '1rem' }}>
-            {errorMessage}
+          <div role="alert" style={{ background: '#fff1f0', color: '#a61d24', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', border: '1px solid #ffccc7', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+            <span>{errorMessage}</span>
           </div>
         )}
 
