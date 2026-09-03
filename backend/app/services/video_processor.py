@@ -10,6 +10,34 @@ def extract_frames(video_path: str, frame_interval_sec: float = 1.0) -> List[Dic
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise ValueError("Error opening video file")
+
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    frame_count = 0
+    frame_interval = max(1, int(fps * frame_interval_sec))
+
+    try:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            if frame_count % frame_interval == 0:
+                resized_frame = cv2.resize(frame, (224, 224))
+                success, encoded = cv2.imencode(".jpg", resized_frame)
+                if success:
+                    b64_str = base64.b64encode(encoded.tobytes()).decode("utf-8")
+                    timestamp = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+                    frames.append({
+                        "timestamp": round(timestamp, 2),
+                        "image_data": b64_str,
+                    })
+
+            frame_count += 1
+    finally:
+        cap.release()
+
+    return frames if frames else None
+
 import os
 import re
 import cv2
@@ -60,33 +88,7 @@ def is_video_corrupt(file_path: str) -> bool:
     if not ret or frame is None or frame.size == 0 or frame_count <= 0:
         return True
 
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-    frame_count = 0
-    frames: List[Dict[str, Any]] = []
-    frame_interval = max(1, int(fps * frame_interval_sec))
-
-    try:
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-
-            if frame_count % frame_interval == 0:
-                resized_frame = cv2.resize(frame, (224, 224))
-                success, encoded = cv2.imencode(".jpg", resized_frame)
-                if success:
-                    b64_str = base64.b64encode(encoded.tobytes()).decode("utf-8")
-                    timestamp = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
-                    frames.append({
-                        "timestamp": round(timestamp, 2),
-                        "image_data": b64_str,
-                    })
-
-            frame_count += 1
-    finally:
-        cap.release()
-
-    return frames if frames else None
+    return False
 
 
 async def process_video(video_path: str, frame_dir: str, sample_interval_sec: int = 2) -> List[str]:
