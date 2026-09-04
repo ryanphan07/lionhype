@@ -46,7 +46,10 @@ async def upload_video(file: UploadFile = File(...)):
             file.file.seek(0, 2)
             file_size = file.file.tell()
             file.file.seek(0)
-        validate_upload_metadata(file.filename, file_size)
+        try:
+            validate_upload_metadata(file.filename, file_size)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
         with open(video_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)

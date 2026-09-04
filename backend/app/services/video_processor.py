@@ -36,7 +36,7 @@ def extract_frames(video_path: str, frame_interval_sec: float = 1.0) -> List[Dic
     finally:
         cap.release()
 
-    return frames if frames else None
+    return frames if frames else []
 
 import os
 import re

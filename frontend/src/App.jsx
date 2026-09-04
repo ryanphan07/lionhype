@@ -36,7 +36,7 @@ function App() {
 
     socket.onmessage = (event) => {
       const msg = JSON.parse(event.data);
-      const status = msg.status || msg.phase || msg.message;
+      const status = msg.status;
       const progressVal = msg.progress ?? 0;
 
       if (['uploading', 'extracting', 'analyzing', 'synthesizing'].includes(status)) {
@@ -60,7 +60,7 @@ function App() {
         setErrorMessage(msg.message || 'Video analysis failed.');
         setPipelineStage('error');
         toast.error(msg.message || 'Video analysis failed.', {
-          position: toast.POSITION.TOP_RIGHT,
+          position: "top-right",
         });
       }
     };
@@ -78,6 +78,12 @@ function App() {
       if (processingStatus !== 'completed' && processingStatus !== 'error') {
         setProcessingStatus('idle');
         setPipelineStage('');
+        // Auto-reconnect after a short delay if not manually closed
+        setTimeout(() => {
+          if (socketRef.current?.readyState !== WebSocket.OPEN) {
+            connectSocket();
+          }
+        }, 2000);
       }
     };
   };
