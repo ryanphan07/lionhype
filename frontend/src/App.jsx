@@ -70,7 +70,7 @@ function App() {
       setErrorMessage('Unable to connect to the analysis WebSocket.');
       setPipelineStage('error');
       toast.error('Unable to connect to the analysis WebSocket.', {
-        position: toast.POSITION.TOP_RIGHT,
+        position: "top-right",
       });
     };
 
@@ -128,6 +128,9 @@ function App() {
       console.error('Error uploading video:', error);
       setProcessingStatus('error');
       setErrorMessage(error.response?.data?.detail || 'Failed to upload video.');
+      toast.error(error.response?.data?.detail || 'Failed to upload video.', {
+        position: "top-right",
+      });
     }
   };
 
@@ -157,17 +160,12 @@ function App() {
         )}
 
         {pipelineStage && (
-          <div style={{ margin: '1rem 0' }}>
-            <strong>Stage:</strong> {pipelineStage}
+          <div style={{ margin: '1rem 0', padding: '0.5rem 1rem', background: '#f0f9ff', borderRadius: '4px', border: '1px solid #bae6fd', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span>📊</span>
+            <strong>Phase:</strong> {pipelineStage.charAt(0).toUpperCase() + pipelineStage.slice(1)}
           </div>
         )}
 
-        {errorMessage && (
-          <div role="alert" style={{ background: '#fff1f0', color: '#a61d24', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', border: '1px solid #ffccc7', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ fontSize: '1.2rem' }}>⚠️</span>
-            <span>{errorMessage}</span>
-          </div>
-        )}
 
         {videoUrl && (
           <div>
