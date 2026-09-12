@@ -40,12 +40,14 @@ async def upload_video(file: UploadFile = File(...)):
     os.makedirs(frame_dir, exist_ok=True)
 
     try:
-        # Validate file extension and size before writing
+        # Determine file size for validation
         file_size = file.size
         if file_size is None:
             file.file.seek(0, 2)
             file_size = file.file.tell()
             file.file.seek(0)
+
+        # Enforce strict file validation (extension & size)
         try:
             validate_upload_metadata(file.filename, file_size)
         except ValueError as e:
@@ -54,15 +56,18 @@ async def upload_video(file: UploadFile = File(...)):
         with open(video_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # Check for file corruption
+        # Verify container integrity before proceeding with processing
         if is_video_corrupt(video_path):
             os.remove(video_path)
             raise HTTPException(status_code=400, detail="The uploaded video file is corrupt.")
 
         frame_paths = await process_video(video_path, frame_dir, sample_interval_sec=2)
         return JSONResponse(content={"video_id": video_id, "video_path": video_path, "frame_paths": frame_paths})
+    except HTTPException:
+        # Re-raise validation/processing HTTP exceptions directly
+        raise
     except Exception as e:
-        # Clean up uploaded files on failure
+        # Clean up uploaded files on unexpected failure
         if os.path.exists(video_path):
             os.remove(video_path)
         if os.path.exists(frame_dir):
