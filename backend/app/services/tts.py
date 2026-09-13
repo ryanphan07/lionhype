@@ -1,10 +1,26 @@
 import os
+import asyncio
 from typing import Any, Dict, List, Optional
+
+from app.config import Settings
 
 try:
     from edge_tts import Communicate
 except ImportError:  # pragma: no cover
     Communicate = None
+
+settings = Settings()
+
+async def _retry_tts_call(func, max_retries=settings.TTS_MAX_RETRIES, base_delay=1.0, timeout=settings.TTS_TIMEOUT):
+    last_exc = None
+    for attempt in range(max_retries + 1):
+        try:
+            return await asyncio.wait_for(func(), timeout=timeout)
+        except Exception as e:
+            last_exc = e
+            if attempt < max_retries:
+                await asyncio.sleep(base_delay * (2 ** attempt))
+    raise last_exc
 
 
 async def generate_audio_clip(quip: Dict[str, Any], video_id: Optional[str] = None) -> Dict[str, Any]:
@@ -17,9 +33,15 @@ async def generate_audio_clip(quip: Dict[str, Any], video_id: Optional[str] = No
     audio_filename = f"audio_{timestamp:.2f}.mp3"
     audio_path = os.path.join(audio_dir, audio_filename)
 
-    if Communicate is not None:
-        communicate = Communicate(text, "en-US-AnaNeural")
-        await communicate.save(audio_path)
+    if settings.TTS_ENABLED and Communicate is not None:
+        async def _call_tts():
+            communicate = Communicate(text, settings.TTS_VOICE)
+            await communicate.save(audio_path)
+        try:
+            await _retry_tts_call(_call_tts)
+        except Exception:
+            with open(audio_path, "wb") as fake_audio:
+                fake_audio.write(b"fake-audio")
     else:
         with open(audio_path, "wb") as fake_audio:
             fake_audio.write(b"fake-audio")
