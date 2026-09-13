@@ -88,12 +88,13 @@ Features in place:
 
 Features in place:
 - `/api/upload` for video upload handling
-- `/api/commentary/generate` for direct commentary generation
+- `/api/upload/presigned-url` for generating secure upload URLs
+- `/api/commentary/generate` for direct commentary generation using background tasks
 - `/api/commentary/mock` retained as a deprecated endpoint
 - `@app.websocket("/ws/analyze")` for real-time analysis progress
-- JSON progress messages with statuses such as `processing` and `completed`
+- JSON progress messages using canonical phases: `uploading`, `extracting`, `analyzing`, `synthesizing`, `completed`, and `error`
 - Error propagation with standardized 500 JSON responses from the global exception handler
-- WebSocket disconnect handling
+- WebSocket disconnect handling and auto-reconnect logic on the frontend
 
 This is the main runtime entrypoint for the backend app.
 
@@ -111,13 +112,13 @@ The frontend lives in `frontend/src`.
 
 #### App-level flow
 `frontend/src/App.jsx` does the following:
-- Accepts video upload input
-- Posts the file to the backend
-- Opens a WebSocket to `ws://localhost:8000/ws/analyze`
-- Tracks backend processing messages
-- Updates UI status/progress indicators
+- Accepts video upload input and posts it to the backend
+- Opens a WebSocket to `ws://backend:8000/ws/analyze`
+- Tracks backend processing messages across canonical phases (`uploading`, `extracting`, `analyzing`, `synthesizing`, `completed`, `error`)
+- Updates UI status/progress indicators and pipeline stage labels
 - Stores final commentary quips when processing completes
-- Displays explicit error messaging if analysis fails
+- Displays explicit error messaging via `react-toastify` if analysis fails
+- Implements auto-reconnect logic for WebSocket drops
 
 #### Video player UI
 `frontend/src/components/VideoPlayer.jsx` handles the playback experience.
@@ -181,11 +182,10 @@ The project is tested with mock objects, but it is not yet proven against:
 - actual WebSocket stress/load conditions
 
 ### 4. Frontend polish
-The frontend is functional but still relatively minimal:
-- limited state models for richer status transitions
-- no strong error toast UX beyond basic alert blocks
+The frontend is functional and handles core pipeline states, but still relatively minimal:
 - limited playback orchestration beyond timestamp-based triggers
 - no deeper visual dashboard or timeline analytics
+- quip highlighting and timeline scrubbing could be improved
 
 ### 5. Deployment and infrastructure
 The repo does not yet present a fully defined deployment strategy for:
@@ -215,34 +215,32 @@ The main architecture and flow are in place. The remaining work is mostly about 
 
 ## Recommended next steps
 
-### Priority 1: make the pipeline production-safe
-- Add stricter validation around uploaded videos and file paths
-- Define exact config for LLM and TTS providers
-- Standardize error handling and logging across all services
-- Decide how generated audio files are stored and exposed in production
+### Priority 1: Wire up validation and secure uploads
+- Integrate `validate_upload_metadata` and `is_video_corrupt` into the `/api/upload` route
+- Enforce strict file extension and size limits before processing begins
+- Ensure temporary files are cleaned up on all failure paths per backend conventions
 
-### Priority 2: harden backend reliability
-- Add more unit tests around failure cases
-- Validate behavior on invalid video files
-- Add retry and timeout logic for external AI services
-- Ensure WebSocket clients handle reconnects gracefully
+### Priority 2: Harden backend reliability & logging
+- Add comprehensive logging across the commentary pipeline
+- Implement retry and timeout logic for external AI services (LLM/TTS)
+- Add more unit tests around failure cases and invalid video files
+- Ensure WebSocket clients handle reconnects gracefully (already partially implemented)
 
-### Priority 3: improve frontend UX
-- Add richer progress states such as `extracting`, `analyzing`, `synthesizing`, `completed`, `error`
-- Improve toast/alert handling and visible user feedback
-- Consider timeline playback improvements and better quip highlighting
-- Add basic loading and empty states
+### Priority 3: Finalize LLM/TTS production integration
+- Define exact configuration for chosen LLM and TTS providers
+- Standardize audio storage strategy (local vs cloud/object storage)
+- Remove or clearly mark deprecated/mock endpoints (`/api/commentary/mock`)
 
-### Priority 4: validate on real content
-- Test against actual lion dance footage
-- Measure runtime and performance across different video lengths
+### Priority 4: Improve frontend UX & playback
+- Add timeline scrubbing and better quip highlighting during playback
+- Implement loading and empty states for smoother UX
+- Consider adding a visual dashboard for pipeline analytics
+
+### Priority 5: Validate on real content & prepare for deployment
+- Test against actual lion dance footage to measure runtime and performance
 - Tune the frame sampling strategy for quality vs. latency vs. cost
-
-### Priority 5: prepare for deployment
-- Add Dockerfile and/or deployment scripts if needed
-- Define environment variables and `.env` conventions
-- Decide hosting strategy for frontend and API
-- Document how to run in a real environment
+- Add Dockerfile and/or deployment scripts
+- Define environment variables and `.env` conventions for production hosting
 
 ## Repo structure
 
