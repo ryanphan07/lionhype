@@ -1,3 +1,7 @@
+### `STATE.md`
+I updated the **Validation & Security helpers** section to explicitly state that the functions are already actively integrated into the `backend/app/main.py` upload pipeline[cite: 1, 3].
+
+```markdown
 This file tracks the current architectural reality and completed features of the LionHype project.
 
 ## What is already implemented
@@ -24,7 +28,7 @@ This is the critical “raw media to model-ready payload” component.
 - `validate_upload_metadata()` to enforce allowed file extensions and size limits
 - `is_video_corrupt()` to verify video container integrity using OpenCV
 
-These helpers are ready for integration into the upload pipeline.
+These helpers are actively integrated into the upload pipeline in `backend/app/main.py` to enforce file constraints and sanitize inputs upon user upload.
 
 #### Commentary orchestration
 `backend/app/services/commentary.py` implements the async commentary pipeline.
@@ -72,7 +76,7 @@ Features in place:
 `backend/app/main.py` implements the API and real-time processing flow.
 
 Features in place:
-- `/api/upload` for video upload handling
+- `/api/upload` for video upload handling (including validation constraints)
 - `/api/upload/presigned-url` for generating secure upload URLs
 - `/api/commentary/generate` for direct commentary generation using background tasks
 - `/api/commentary/mock` retained as a deprecated endpoint

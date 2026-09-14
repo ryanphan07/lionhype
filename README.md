@@ -30,8 +30,6 @@ This gives the app a real-time “commentary pipeline” pattern: extraction -> 
 - `backend/app/services/tts.py` – audio generation
 - `backend/tests/` – mocked integration tests
 - `frontend/src/` – React app and real-time UI
-- `assets/` – local media and sound assets
-- `video_input/` – video source samples
 
 ## Quick run instructions
 
@@ -41,18 +39,4 @@ cd backend
 python -m venv venv
 source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn main:app --host 0.0.0.0 --port 8000
-```
-
-### Frontend
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-### Test run
-```bash
-cd backend
-pytest -q
-```
+uvicorn app.main:app --host 0.0.0.0 --port 8000

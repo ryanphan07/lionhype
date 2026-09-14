@@ -6,7 +6,6 @@ The repo is not yet production-grade. The current state is best described as a w
 
 ### 1. Production hardening
 Missing or incomplete areas include:
-- stronger input validation for uploaded files
 - safe handling of missing or invalid videos
 - more robust logging and monitoring
 
@@ -41,10 +40,8 @@ The repo does not yet present a fully defined deployment strategy for:
 
 ### 6. Security and operational concerns
 Potential follow-ups include:
-- limiting upload size and file extensions
 - securing WebSocket access
 - avoiding direct trust of user-supplied file paths
-- sanitizing and validating generated filenames
 - controlling backend access to AI services and external endpoints
 
 ## Recommended next steps
