@@ -106,6 +106,9 @@ This is the main runtime entrypoint for the backend app.
 
 It includes the `audio_url` field needed to attach generated audio to each commentary quip.
 
+#### Deployment & Configuration
+The project is fully Dockerized via `docker-compose`, providing a consistent environment for development and production. It uses a strict `.env` configuration pattern to manage external AI provider credentials and settings, with built-in retry logic for resilient service communication.
+
 ### Frontend
 
 The frontend lives in `frontend/src`.
@@ -159,18 +162,15 @@ The repo is not yet production-grade. The current state is best described as a w
 
 ### 1. Production hardening
 Missing or incomplete areas include:
-- integration of existing validation helpers (`validate_upload_metadata`, `is_video_corrupt`) into the `/api/upload` route
 - stronger input validation for uploaded files
 - safe handling of missing or invalid videos
 - more robust logging and monitoring
-- deployment packaging and environment configuration
 
 ### 2. Real LLM/TTS production integration
 The current code anticipates external AI services but also includes offline fallbacks.
 
 This means:
 - LLM calls can work if a compatible local or remote service is available
-- but the repo does not yet enforce a production-grade single integration path
 - TTS output is generated locally as a fallback pattern, but real production deployment still needs a finalized choice of model/provider and audio storage strategy
 
 ### 3. End-to-end real-world validation
@@ -215,21 +215,10 @@ The main architecture and flow are in place. The remaining work is mostly about 
 
 ## Recommended next steps
 
-### Priority 1: Wire up validation and secure uploads
-- Integrate `validate_upload_metadata` and `is_video_corrupt` into the `/api/upload` route
-- Enforce strict file extension and size limits before processing begins
-- Ensure temporary files are cleaned up on all failure paths per backend conventions
-
 ### Priority 2: Harden backend reliability & logging
 - Add comprehensive logging across the commentary pipeline
-- Implement retry and timeout logic for external AI services (LLM/TTS)
 - Add more unit tests around failure cases and invalid video files
 - Ensure WebSocket clients handle reconnects gracefully (already partially implemented)
-
-### Priority 3: Finalize LLM/TTS production integration
-- Define exact configuration for chosen LLM and TTS providers
-- Standardize audio storage strategy (local vs cloud/object storage)
-- Remove or clearly mark deprecated/mock endpoints (`/api/commentary/mock`)
 
 ### Priority 4: Improve frontend UX & playback
 - Add timeline scrubbing and better quip highlighting during playback
@@ -239,8 +228,6 @@ The main architecture and flow are in place. The remaining work is mostly about 
 ### Priority 5: Validate on real content & prepare for deployment
 - Test against actual lion dance footage to measure runtime and performance
 - Tune the frame sampling strategy for quality vs. latency vs. cost
-- Add Dockerfile and/or deployment scripts
-- Define environment variables and `.env` conventions for production hosting
 
 ## Repo structure
 
