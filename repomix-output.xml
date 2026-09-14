@@ -42,6 +42,13 @@ The content is organized as follows:
 </file_summary>
 
 <directory_structure>
+.history/
+  README_20260913215813.md
+  README_20260914164854.md
+  STATE_20260913215813.md
+  STATE_20260914164922.md
+  TASKS_20260913215813.md
+  TASKS_20260914164928.md
 backend/
   .history/
     app/
@@ -110,50 +117,525 @@ TASKS.md
 <files>
 This section contains the contents of the repository's files.
 
-<file path="CONVENTIONS.md">
-# Project Conventions & Documentation Rules
+<file path=".history/README_20260913215813.md">
+# LionHype: AI Lion Dance Commentator
 
-## Documentation
-1. **Documentation Updates**: Whenever you modify API routes, update status flows, add validation, or alter backend services, update `README.md` to reflect the changes.
-2. **Current Capabilities Sync**: Keep the "What is already implemented" and "What is missing or incomplete" sections in `README.md` accurate after every code change.
-   > Note: this file is loaded read-only and is not always enough on its own to trigger doc updates — prompts that change routes, status flows, or services should explicitly include "update README.md per CONVENTIONS.md" as a numbered step.
+LionHype is a local-first AI application for analyzing lion dance performances and turning them into humorous, time-synced commentary with audio playback. The project blends a FastAPI backend, OpenCV-based frame extraction, LLM-driven event analysis, TTS synthesis, and a lightweight React frontend. In its current form it is a working prototype and proof-of-concept rather than a production-ready SaaS or broadcast platform.
 
-## WebSocket Message Contract
-All `/ws/analyze` messages from backend to frontend use this shape:
-```json
-{
-  "status": "uploading" | "extracting" | "analyzing" | "synthesizing" | "completed" | "error",
-  "progress": 0-100,
-  "message": "optional human-readable detail, required when status is 'error'"
-}
+## High-level overview
+
+The repo is organized around a simple end-to-end flow:
+
+1. A user uploads a video.
+2. The backend extracts sampled frames with OpenCV.
+3. Frames are converted to base64 JPEG payloads for downstream vision/LLM processing.
+4. The app generates commentary quips with timestamps.
+5. Audio clips are synthesized for each quip.
+6. The frontend connects to a WebSocket for live progress updates and then renders the final timeline and playback controls.
+
+This gives the app a real-time “commentary pipeline” pattern: extraction -> analysis -> synthesis -> UI updates.
+
+## Developer Documentation
+
+- [Current Implementation Status & Features](./STATE.md)
+- [Active Development Roadmap & Tasks](./TASKS.md)
+
+## Repo structure
+
+- `backend/` – FastAPI application, OpenCV processing, LLM/TTS services, schemas, tests
+- `backend/app/main.py` – app entrypoint and API/WebSocket routes
+- `backend/app/services/video_processor.py` – frame extraction logic
+- `backend/app/services/commentary.py` – async processing pipeline
+- `backend/app/services/llm.py` – event timeline generation
+- `backend/app/services/tts.py` – audio generation
+- `backend/tests/` – mocked integration tests
+- `frontend/src/` – React app and real-time UI
+- `assets/` – local media and sound assets
+- `video_input/` – video source samples
+
+## Quick run instructions
+
+### Backend
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate   # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 8000
 ```
-- The field is always `status` — do not also check `msg.phase` or fall back to `msg.message` for the phase value.
-- Frontend listeners should switch on `msg.status` directly.
 
-## Canonical Processing Phases
-The full, ordered list of phases used across frontend and backend:
+### Frontend
+```bash
+cd frontend
+npm install
+npm run dev
 ```
-idle -> uploading -> extracting -> analyzing -> synthesizing -> completed
-                                                               -> error
+
+### Test run
+```bash
+cd backend
+pytest -q
 ```
-- Use these exact strings everywhere (state values, WebSocket payloads, UI labels). Don't introduce new phase names or reorder without updating this list.
+</file>
 
-## Library / API Pins
-- **react-toastify**: use string literals for position, e.g. `toast.error(msg, { position: "top-right" })`. Do NOT use `toast.POSITION.TOP_RIGHT` (deprecated).
-- (Add further pins here as they come up — package name, the deprecated/wrong pattern to avoid, and the correct one.)
+<file path=".history/README_20260914164854.md">
+# LionHype: AI Lion Dance Commentator
 
-## Backend Error & Cleanup Pattern
-- Any upload/processing failure path must delete temporary/uploaded files before raising.
-- Raise `HTTPException` with a JSON body shaped as `{"detail": "<clear message>"}`.
-- Validation (filename sanitization, extension/size limits, corruption checks) happens before any file write is considered final.
+LionHype is a local-first AI application for analyzing lion dance performances and turning them into humorous, time-synced commentary with audio playback. The project blends a FastAPI backend, OpenCV-based frame extraction, LLM-driven event analysis, TTS synthesis, and a lightweight React frontend. In its current form it is a working prototype and proof-of-concept rather than a production-ready SaaS or broadcast platform.
 
-## File & Folder Layout
-- Backend business logic / processing helpers: `backend/app/services/`
-- Backend routes/entrypoints: `backend/app/main.py`
-- Backend tests: `backend/tests/`
-- Frontend components: `frontend/src/components/`
-- Frontend top-level app/state: `frontend/src/App.jsx`
-- (Fill in additional paths as the project grows — new service modules, new component subfolders, etc.)
+## High-level overview
+
+The repo is organized around a simple end-to-end flow:
+
+1. A user uploads a video.
+2. The backend extracts sampled frames with OpenCV.
+3. Frames are converted to base64 JPEG payloads for downstream vision/LLM processing.
+4. The app generates commentary quips with timestamps.
+5. Audio clips are synthesized for each quip.
+6. The frontend connects to a WebSocket for live progress updates and then renders the final timeline and playback controls.
+
+This gives the app a real-time “commentary pipeline” pattern: extraction -> analysis -> synthesis -> UI updates.
+
+## Developer Documentation
+
+- [Current Implementation Status & Features](./STATE.md)
+- [Active Development Roadmap & Tasks](./TASKS.md)
+
+## Repo structure
+
+- `backend/` – FastAPI application, OpenCV processing, LLM/TTS services, schemas, tests
+- `backend/app/main.py` – app entrypoint and API/WebSocket routes
+- `backend/app/services/video_processor.py` – frame extraction logic
+- `backend/app/services/commentary.py` – async processing pipeline
+- `backend/app/services/llm.py` – event timeline generation
+- `backend/app/services/tts.py` – audio generation
+- `backend/tests/` – mocked integration tests
+- `frontend/src/` – React app and real-time UI
+
+## Quick run instructions
+
+### Backend
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate   # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+</file>
+
+<file path=".history/STATE_20260913215813.md">
+This file tracks the current architectural reality and completed features of the LionHype project.
+
+## What is already implemented
+
+### Backend
+
+#### Frame extraction
+The core extraction logic is implemented in `backend/app/services/video_processor.py`.
+
+Features in place:
+- OpenCV video capture via `cv2.VideoCapture`
+- Failure handling when a file cannot be opened
+- FPS-based sampling via `frame_interval_sec`
+- Frame resizing to a smaller output size (224x224) for efficient downstream payload size
+- JPEG encoding and base64 conversion for each selected frame
+- Timestamp generation in seconds with rounding
+- Resource cleanup via `finally` and `cap.release()`
+
+This is the critical “raw media to model-ready payload” component.
+
+#### Validation & Security helpers
+`backend/app/services/video_processor.py` includes utility functions for input validation and integrity checks:
+- `sanitize_filename()` to prevent path traversal attacks
+- `validate_upload_metadata()` to enforce allowed file extensions and size limits
+- `is_video_corrupt()` to verify video container integrity using OpenCV
+
+These helpers are ready for integration into the upload pipeline.
+
+#### Commentary orchestration
+`backend/app/services/commentary.py` implements the async commentary pipeline.
+
+Features in place:
+- `process_video_commentary(video_path)` as the core async orchestrator
+- CPU-bound frame extraction offloaded via `asyncio.to_thread`
+- LLM event timeline generation via `generate_event_timeline(frames)`
+- Concurrent TTS generation via `asyncio.gather`
+- Mapping audio URLs back to corresponding quip objects
+- Structured `CommentaryResponse` return values
+
+This is the main “content pipeline” that turns extracted visual frames into final commentary items with audio.
+
+#### LLM integration
+`backend/app/services/llm.py` contains the LLM-facing logic.
+
+Features in place:
+- Local/offline-friendly fallback when no LLM client is configured
+- Timeline normalization for both `timestamp` and `timestamp_ms` formats
+- A generated event timeline based on input frames when external services are unavailable
+- A system prompt designed for energetic lion-dance-style commentary
+
+The code is intentionally resilient in CI and offline environments.
+
+#### TTS synthesis
+`backend/app/services/tts.py` adds audio clip generation.
+
+Features in place:
+- Per-quip audio generation based on timestamp and text
+- Output path in the backend upload/audio folder
+- URL generation for playback from the app server
+- Fallback behavior if TTS dependency is missing
+
+#### MCP Soundboard Server
+`backend/mcp_server.py` implements a FastMCP server for LLM-driven sound effects.
+
+Features in place:
+- Exposes a `trigger_sfx` tool to LLM agents
+- Supports effects like gong, cymbals, airhorn, and drumroll
+- Returns structured event strings for timestamp synchronization
+- Designed to integrate with the commentary pipeline for dynamic audio cues
+
+#### FastAPI app and websocket flow
+`backend/app/main.py` implements the API and real-time processing flow.
+
+Features in place:
+- `/api/upload` for video upload handling
+- `/api/upload/presigned-url` for generating secure upload URLs
+- `/api/commentary/generate` for direct commentary generation using background tasks
+- `/api/commentary/mock` retained as a deprecated endpoint
+- `@app.websocket("/ws/analyze")` for real-time analysis progress
+- JSON progress messages using canonical phases: `uploading`, `extracting`, `analyzing`, `synthesizing`, `completed`, and `error`
+- Error propagation with standardized 500 JSON responses from the global exception handler
+- WebSocket disconnect handling and auto-reconnect logic on the frontend
+
+This is the main runtime entrypoint for the backend app.
+
+#### Schemas
+`backend/app/schemas/events.py` defines the data models used by the app:
+- `EventTimeline`
+- `CommentaryQuip`
+- `CommentaryResponse`
+
+It includes the `audio_url` field needed to attach generated audio to each commentary quip.
+
+#### Deployment & Configuration
+The project is fully Dockerized via `docker-compose`, providing a consistent environment for development and production. It uses a strict `.env` configuration pattern to manage external AI provider credentials and settings, with built-in retry logic for resilient service communication.
+
+### Frontend
+
+The frontend lives in `frontend/src`.
+
+#### App-level flow
+`frontend/src/App.jsx` does the following:
+- Accepts video upload input and posts it to the backend
+- Opens a WebSocket to `ws://backend:8000/ws/analyze`
+- Tracks backend processing messages across canonical phases (`uploading`, `extracting`, `analyzing`, `synthesizing`, `completed`, `error`)
+- Updates UI status/progress indicators and pipeline stage labels
+- Stores final commentary quips when processing completes
+- Displays explicit error messaging via `react-toastify` if analysis fails
+- Implements auto-reconnect logic for WebSocket drops
+
+#### Video player UI
+`frontend/src/components/VideoPlayer.jsx` handles the playback experience.
+
+Features in place:
+- Displays the uploaded video
+- Watches the current playback time against quip timestamps
+- Triggers audio playback as each commentary point is reached
+- Renders the final quip list once processing is complete
+- Includes audio controls for the synthesized clips
+
+### Testing
+`backend/tests/test_main.py` contains mocked integration-style tests covering:
+- frame extraction payload structure
+- commentary generation with audio mapping
+- WebSocket flow for final output exchange
+
+These tests mock OpenCV capture, LLM output, and TTS generation so they can run in CI without actual video hardware or paid external APIs.
+
+## Current maturity assessment
+
+This repo is best categorized as:
+- a local-first prototype,
+- capable of demonstrating the requested flow,
+- useful for iteration and experimentation,
+- not yet a hardened shipped product.
+
+The main architecture and flow are in place. The remaining work is mostly about robustness, real-world validation, operational polish, and deployment readiness.
+</file>
+
+<file path=".history/STATE_20260914164922.md">
+### `STATE.md`
+I updated the **Validation & Security helpers** section to explicitly state that the functions are already actively integrated into the `backend/app/main.py` upload pipeline[cite: 1, 3].
+
+```markdown
+This file tracks the current architectural reality and completed features of the LionHype project.
+
+## What is already implemented
+
+### Backend
+
+#### Frame extraction
+The core extraction logic is implemented in `backend/app/services/video_processor.py`.
+
+Features in place:
+- OpenCV video capture via `cv2.VideoCapture`
+- Failure handling when a file cannot be opened
+- FPS-based sampling via `frame_interval_sec`
+- Frame resizing to a smaller output size (224x224) for efficient downstream payload size
+- JPEG encoding and base64 conversion for each selected frame
+- Timestamp generation in seconds with rounding
+- Resource cleanup via `finally` and `cap.release()`
+
+This is the critical “raw media to model-ready payload” component.
+
+#### Validation & Security helpers
+`backend/app/services/video_processor.py` includes utility functions for input validation and integrity checks:
+- `sanitize_filename()` to prevent path traversal attacks
+- `validate_upload_metadata()` to enforce allowed file extensions and size limits
+- `is_video_corrupt()` to verify video container integrity using OpenCV
+
+These helpers are actively integrated into the upload pipeline in `backend/app/main.py` to enforce file constraints and sanitize inputs upon user upload.
+
+#### Commentary orchestration
+`backend/app/services/commentary.py` implements the async commentary pipeline.
+
+Features in place:
+- `process_video_commentary(video_path)` as the core async orchestrator
+- CPU-bound frame extraction offloaded via `asyncio.to_thread`
+- LLM event timeline generation via `generate_event_timeline(frames)`
+- Concurrent TTS generation via `asyncio.gather`
+- Mapping audio URLs back to corresponding quip objects
+- Structured `CommentaryResponse` return values
+
+This is the main “content pipeline” that turns extracted visual frames into final commentary items with audio.
+
+#### LLM integration
+`backend/app/services/llm.py` contains the LLM-facing logic.
+
+Features in place:
+- Local/offline-friendly fallback when no LLM client is configured
+- Timeline normalization for both `timestamp` and `timestamp_ms` formats
+- A generated event timeline based on input frames when external services are unavailable
+- A system prompt designed for energetic lion-dance-style commentary
+
+The code is intentionally resilient in CI and offline environments.
+
+#### TTS synthesis
+`backend/app/services/tts.py` adds audio clip generation.
+
+Features in place:
+- Per-quip audio generation based on timestamp and text
+- Output path in the backend upload/audio folder
+- URL generation for playback from the app server
+- Fallback behavior if TTS dependency is missing
+
+#### MCP Soundboard Server
+`backend/mcp_server.py` implements a FastMCP server for LLM-driven sound effects.
+
+Features in place:
+- Exposes a `trigger_sfx` tool to LLM agents
+- Supports effects like gong, cymbals, airhorn, and drumroll
+- Returns structured event strings for timestamp synchronization
+- Designed to integrate with the commentary pipeline for dynamic audio cues
+
+#### FastAPI app and websocket flow
+`backend/app/main.py` implements the API and real-time processing flow.
+
+Features in place:
+- `/api/upload` for video upload handling (including validation constraints)
+- `/api/upload/presigned-url` for generating secure upload URLs
+- `/api/commentary/generate` for direct commentary generation using background tasks
+- `/api/commentary/mock` retained as a deprecated endpoint
+- `@app.websocket("/ws/analyze")` for real-time analysis progress
+- JSON progress messages using canonical phases: `uploading`, `extracting`, `analyzing`, `synthesizing`, `completed`, and `error`
+- Error propagation with standardized 500 JSON responses from the global exception handler
+- WebSocket disconnect handling and auto-reconnect logic on the frontend
+
+This is the main runtime entrypoint for the backend app.
+
+#### Schemas
+`backend/app/schemas/events.py` defines the data models used by the app:
+- `EventTimeline`
+- `CommentaryQuip`
+- `CommentaryResponse`
+
+It includes the `audio_url` field needed to attach generated audio to each commentary quip.
+
+#### Deployment & Configuration
+The project is fully Dockerized via `docker-compose`, providing a consistent environment for development and production. It uses a strict `.env` configuration pattern to manage external AI provider credentials and settings, with built-in retry logic for resilient service communication.
+
+### Frontend
+
+The frontend lives in `frontend/src`.
+
+#### App-level flow
+`frontend/src/App.jsx` does the following:
+- Accepts video upload input and posts it to the backend
+- Opens a WebSocket to `ws://backend:8000/ws/analyze`
+- Tracks backend processing messages across canonical phases (`uploading`, `extracting`, `analyzing`, `synthesizing`, `completed`, `error`)
+- Updates UI status/progress indicators and pipeline stage labels
+- Stores final commentary quips when processing completes
+- Displays explicit error messaging via `react-toastify` if analysis fails
+- Implements auto-reconnect logic for WebSocket drops
+
+#### Video player UI
+`frontend/src/components/VideoPlayer.jsx` handles the playback experience.
+
+Features in place:
+- Displays the uploaded video
+- Watches the current playback time against quip timestamps
+- Triggers audio playback as each commentary point is reached
+- Renders the final quip list once processing is complete
+- Includes audio controls for the synthesized clips
+
+### Testing
+`backend/tests/test_main.py` contains mocked integration-style tests covering:
+- frame extraction payload structure
+- commentary generation with audio mapping
+- WebSocket flow for final output exchange
+
+These tests mock OpenCV capture, LLM output, and TTS generation so they can run in CI without actual video hardware or paid external APIs.
+
+## Current maturity assessment
+
+This repo is best categorized as:
+- a local-first prototype,
+- capable of demonstrating the requested flow,
+- useful for iteration and experimentation,
+- not yet a hardened shipped product.
+
+The main architecture and flow are in place. The remaining work is mostly about robustness, real-world validation, operational polish, and deployment readiness.
+</file>
+
+<file path=".history/TASKS_20260913215813.md">
+This file tracks active development tasks, known gaps, and the roadmap for LionHype.
+
+## What is missing or incomplete
+
+The repo is not yet production-grade. The current state is best described as a working prototype with a few critical gaps.
+
+### 1. Production hardening
+Missing or incomplete areas include:
+- stronger input validation for uploaded files
+- safe handling of missing or invalid videos
+- more robust logging and monitoring
+
+### 2. Real LLM/TTS production integration
+The current code anticipates external AI services but also includes offline fallbacks.
+
+This means:
+- LLM calls can work if a compatible local or remote service is available
+- TTS output is generated locally as a fallback pattern, but real production deployment still needs a finalized choice of model/provider and audio storage strategy
+
+### 3. End-to-end real-world validation
+The project is tested with mock objects, but it is not yet proven against:
+- real uploaded lion dance footage
+- real OpenCV capture edge cases
+- high-volume processing
+- long videos
+- actual WebSocket stress/load conditions
+
+### 4. Frontend polish
+The frontend is functional and handles core pipeline states, but still relatively minimal:
+- limited playback orchestration beyond timestamp-based triggers
+- no deeper visual dashboard or timeline analytics
+- quip highlighting and timeline scrubbing could be improved
+
+### 5. Deployment and infrastructure
+The repo does not yet present a fully defined deployment strategy for:
+- backend hosting
+- frontend hosting
+- audio/static asset serving in production
+- environment variables and configuration separation
+- containerization or cloud deployment
+
+### 6. Security and operational concerns
+Potential follow-ups include:
+- limiting upload size and file extensions
+- securing WebSocket access
+- avoiding direct trust of user-supplied file paths
+- sanitizing and validating generated filenames
+- controlling backend access to AI services and external endpoints
+
+## Recommended next steps
+
+### Priority 2: Harden backend reliability & logging
+- [ ] Add comprehensive logging across the commentary pipeline
+- [ ] Add more unit tests around failure cases and invalid video files
+- [ ] Ensure WebSocket clients handle reconnects gracefully (already partially implemented)
+
+### Priority 4: Improve frontend UX & playback
+- [ ] Add timeline scrubbing and better quip highlighting during playback
+- [ ] Implement loading and empty states for smoother UX
+- [ ] Consider adding a visual dashboard for pipeline analytics
+
+### Priority 5: Validate on real content & prepare for deployment
+- [ ] Test against actual lion dance footage to measure runtime and performance
+- [ ] Tune the frame sampling strategy for quality vs. latency vs. cost
+</file>
+
+<file path=".history/TASKS_20260914164928.md">
+This file tracks active development tasks, known gaps, and the roadmap for LionHype.
+
+## What is missing or incomplete
+
+The repo is not yet production-grade. The current state is best described as a working prototype with a few critical gaps.
+
+### 1. Production hardening
+Missing or incomplete areas include:
+- safe handling of missing or invalid videos
+- more robust logging and monitoring
+
+### 2. Real LLM/TTS production integration
+The current code anticipates external AI services but also includes offline fallbacks.
+
+This means:
+- LLM calls can work if a compatible local or remote service is available
+- TTS output is generated locally as a fallback pattern, but real production deployment still needs a finalized choice of model/provider and audio storage strategy
+
+### 3. End-to-end real-world validation
+The project is tested with mock objects, but it is not yet proven against:
+- real uploaded lion dance footage
+- real OpenCV capture edge cases
+- high-volume processing
+- long videos
+- actual WebSocket stress/load conditions
+
+### 4. Frontend polish
+The frontend is functional and handles core pipeline states, but still relatively minimal:
+- limited playback orchestration beyond timestamp-based triggers
+- no deeper visual dashboard or timeline analytics
+- quip highlighting and timeline scrubbing could be improved
+
+### 5. Deployment and infrastructure
+The repo does not yet present a fully defined deployment strategy for:
+- backend hosting
+- frontend hosting
+- audio/static asset serving in production
+- environment variables and configuration separation
+- containerization or cloud deployment
+
+### 6. Security and operational concerns
+Potential follow-ups include:
+- securing WebSocket access
+- avoiding direct trust of user-supplied file paths
+- controlling backend access to AI services and external endpoints
+
+## Recommended next steps
+
+### Priority 2: Harden backend reliability & logging
+- [ ] Add comprehensive logging across the commentary pipeline
+- [ ] Add more unit tests around failure cases and invalid video files
+- [ ] Ensure WebSocket clients handle reconnects gracefully (already partially implemented)
+
+### Priority 4: Improve frontend UX & playback
+- [ ] Add timeline scrubbing and better quip highlighting during playback
+- [ ] Implement loading and empty states for smoother UX
+- [ ] Consider adding a visual dashboard for pipeline analytics
+
+### Priority 5: Validate on real content & prepare for deployment
+- [ ] Test against actual lion dance footage to measure runtime and performance
+- [ ] Tune the frame sampling strategy for quality vs. latency vs. cost
 </file>
 
 <file path="backend/.history/app/schemas/events_20260831152721.py">
@@ -609,6 +1091,52 @@ If you are developing a production application, we recommend using TypeScript wi
 // https://vite.dev/config/
 </file>
 
+<file path="CONVENTIONS.md">
+# Project Conventions & Documentation Rules
+
+## Documentation
+1. **Documentation Updates**: Whenever you modify API routes, update status flows, add validation, or alter backend services, update `README.md` to reflect the changes.
+2. **Current Capabilities Sync**: Keep the "What is already implemented" and "What is missing or incomplete" sections in `README.md` accurate after every code change.
+   > Note: this file is loaded read-only and is not always enough on its own to trigger doc updates — prompts that change routes, status flows, or services should explicitly include "update README.md per CONVENTIONS.md" as a numbered step.
+
+## WebSocket Message Contract
+All `/ws/analyze` messages from backend to frontend use this shape:
+```json
+{
+  "status": "uploading" | "extracting" | "analyzing" | "synthesizing" | "completed" | "error",
+  "progress": 0-100,
+  "message": "optional human-readable detail, required when status is 'error'"
+}
+```
+- The field is always `status` — do not also check `msg.phase` or fall back to `msg.message` for the phase value.
+- Frontend listeners should switch on `msg.status` directly.
+
+## Canonical Processing Phases
+The full, ordered list of phases used across frontend and backend:
+```
+idle -> uploading -> extracting -> analyzing -> synthesizing -> completed
+                                                               -> error
+```
+- Use these exact strings everywhere (state values, WebSocket payloads, UI labels). Don't introduce new phase names or reorder without updating this list.
+
+## Library / API Pins
+- **react-toastify**: use string literals for position, e.g. `toast.error(msg, { position: "top-right" })`. Do NOT use `toast.POSITION.TOP_RIGHT` (deprecated).
+- (Add further pins here as they come up — package name, the deprecated/wrong pattern to avoid, and the correct one.)
+
+## Backend Error & Cleanup Pattern
+- Any upload/processing failure path must delete temporary/uploaded files before raising.
+- Raise `HTTPException` with a JSON body shaped as `{"detail": "<clear message>"}`.
+- Validation (filename sanitization, extension/size limits, corruption checks) happens before any file write is considered final.
+
+## File & Folder Layout
+- Backend business logic / processing helpers: `backend/app/services/`
+- Backend routes/entrypoints: `backend/app/main.py`
+- Backend tests: `backend/tests/`
+- Frontend components: `frontend/src/components/`
+- Frontend top-level app/state: `frontend/src/App.jsx`
+- (Fill in additional paths as the project grows — new service modules, new component subfolders, etc.)
+</file>
+
 <file path="docker-compose.yml">
 version: '3.8'
 
@@ -640,7 +1168,54 @@ networks:
     driver: bridge
 </file>
 
+<file path="backend/pytest.ini">
+[pytest]
+pythonpath = . ..
+</file>
+
+<file path="frontend/src/components/VideoPlayer.jsx">
+const VideoPlayer = (
+⋮----
+const handleTimeUpdate = () =>
+</file>
+
+<file path="frontend/package.json">
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "axios": "^1.20.0",
+    "lucide-react": "^1.38.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "eslint": "^10.9.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.4",
+    "globals": "^17.11.0",
+    "vite": "^8.2.2"
+  }
+}
+</file>
+
 <file path="STATE.md">
+### `STATE.md`
+I updated the **Validation & Security helpers** section to explicitly state that the functions are already actively integrated into the `backend/app/main.py` upload pipeline[cite: 1, 3].
+
+```markdown
 This file tracks the current architectural reality and completed features of the LionHype project.
 
 ## What is already implemented
@@ -667,7 +1242,7 @@ This is the critical “raw media to model-ready payload” component.
 - `validate_upload_metadata()` to enforce allowed file extensions and size limits
 - `is_video_corrupt()` to verify video container integrity using OpenCV
 
-These helpers are ready for integration into the upload pipeline.
+These helpers are actively integrated into the upload pipeline in `backend/app/main.py` to enforce file constraints and sanitize inputs upon user upload.
 
 #### Commentary orchestration
 `backend/app/services/commentary.py` implements the async commentary pipeline.
@@ -715,7 +1290,7 @@ Features in place:
 `backend/app/main.py` implements the API and real-time processing flow.
 
 Features in place:
-- `/api/upload` for video upload handling
+- `/api/upload` for video upload handling (including validation constraints)
 - `/api/upload/presigned-url` for generating secure upload URLs
 - `/api/commentary/generate` for direct commentary generation using background tasks
 - `/api/commentary/mock` retained as a deprecated endpoint
@@ -789,7 +1364,6 @@ The repo is not yet production-grade. The current state is best described as a w
 
 ### 1. Production hardening
 Missing or incomplete areas include:
-- stronger input validation for uploaded files
 - safe handling of missing or invalid videos
 - more robust logging and monitoring
 
@@ -824,10 +1398,8 @@ The repo does not yet present a fully defined deployment strategy for:
 
 ### 6. Security and operational concerns
 Potential follow-ups include:
-- limiting upload size and file extensions
 - securing WebSocket access
 - avoiding direct trust of user-supplied file paths
-- sanitizing and validating generated filenames
 - controlling backend access to AI services and external endpoints
 
 ## Recommended next steps
@@ -845,49 +1417,6 @@ Potential follow-ups include:
 ### Priority 5: Validate on real content & prepare for deployment
 - [ ] Test against actual lion dance footage to measure runtime and performance
 - [ ] Tune the frame sampling strategy for quality vs. latency vs. cost
-</file>
-
-<file path="backend/pytest.ini">
-[pytest]
-pythonpath = . ..
-</file>
-
-<file path="frontend/src/components/VideoPlayer.jsx">
-const VideoPlayer = (
-⋮----
-const handleTimeUpdate = () =>
-</file>
-
-<file path="frontend/package.json">
-{
-  "name": "frontend",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "axios": "^1.20.0",
-    "lucide-react": "^1.38.0",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8"
-  },
-  "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.4",
-    "@vitejs/plugin-react": "^6.1.0",
-    "eslint": "^10.9.0",
-    "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.4",
-    "globals": "^17.11.0",
-    "vite": "^8.2.2"
-  }
-}
 </file>
 
 <file path="backend/app/services/llm.py">
@@ -1090,6 +1619,23 @@ payload = payload or {}
 async def generate_commentary_endpoint(video_path: str)
 </file>
 
+<file path="backend/app/schemas/events.py">
+class EventTimeline(BaseModel)
+⋮----
+events: List[dict]
+⋮----
+class CommentaryQuip(BaseModel)
+⋮----
+timestamp: float
+text: str
+audio_url: Optional[str] = None
+⋮----
+class CommentaryResponse(BaseModel)
+⋮----
+quips: List[CommentaryQuip]
+video_url: Optional[str] = None  # Add this line
+</file>
+
 <file path="README.md">
 # LionHype: AI Lion Dance Commentator
 
@@ -1123,8 +1669,6 @@ This gives the app a real-time “commentary pipeline” pattern: extraction -> 
 - `backend/app/services/tts.py` – audio generation
 - `backend/tests/` – mocked integration tests
 - `frontend/src/` – React app and real-time UI
-- `assets/` – local media and sound assets
-- `video_input/` – video source samples
 
 ## Quick run instructions
 
@@ -1134,38 +1678,7 @@ cd backend
 python -m venv venv
 source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn main:app --host 0.0.0.0 --port 8000
-```
-
-### Frontend
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-### Test run
-```bash
-cd backend
-pytest -q
-```
-</file>
-
-<file path="backend/app/schemas/events.py">
-class EventTimeline(BaseModel)
-⋮----
-events: List[dict]
-⋮----
-class CommentaryQuip(BaseModel)
-⋮----
-timestamp: float
-text: str
-audio_url: Optional[str] = None
-⋮----
-class CommentaryResponse(BaseModel)
-⋮----
-quips: List[CommentaryQuip]
-video_url: Optional[str] = None  # Add this line
+uvicorn app.main:app --host 0.0.0.0 --port 8000
 </file>
 
 <file path="backend/app/services/commentary.py">
