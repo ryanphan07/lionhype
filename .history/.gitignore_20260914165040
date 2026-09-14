@@ -1,0 +1,22 @@
+﻿# Python
+backend/venv/
+backend/__pycache__/
+backend/app/__pycache__/
+backend/app/*/__pycache__/
+*.pyc
+
+# Uploaded Media
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Environment variables
+*.env
+
+# Node / React (for when frontend is built)
+frontend/node_modules/
+frontend/dist/
+.aider*
+
+.aider*
+
+repomix-output.xml
