@@ -13,7 +13,6 @@ Missing or incomplete areas include:
 The current code anticipates external AI services but also includes offline fallbacks.
 
 This means:
-- LLM calls can work if a compatible local or remote service is available
 - TTS output is generated locally as a fallback pattern, but real production deployment still needs a finalized choice of model/provider and audio storage strategy
 
 ### 3. End-to-end real-world validation
@@ -49,7 +48,6 @@ Potential follow-ups include:
 ### Priority 2: Harden backend reliability & logging
 - [ ] Add comprehensive logging across the commentary pipeline
 - [ ] Add more unit tests around failure cases and invalid video files
-- [ ] Ensure WebSocket clients handle reconnects gracefully (already partially implemented)
 
 ### Priority 4: Improve frontend UX & playback
 - [ ] Add timeline scrubbing and better quip highlighting during playback

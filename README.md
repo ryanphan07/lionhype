@@ -20,17 +20,6 @@ This gives the app a real-time “commentary pipeline” pattern: extraction -> 
 - [Current Implementation Status & Features](./STATE.md)
 - [Active Development Roadmap & Tasks](./TASKS.md)
 
-## Repo structure
-
-- `backend/` – FastAPI application, OpenCV processing, LLM/TTS services, schemas, tests
-- `backend/app/main.py` – app entrypoint and API/WebSocket routes
-- `backend/app/services/video_processor.py` – frame extraction logic
-- `backend/app/services/commentary.py` – async processing pipeline
-- `backend/app/services/llm.py` – event timeline generation
-- `backend/app/services/tts.py` – audio generation
-- `backend/tests/` – mocked integration tests
-- `frontend/src/` – React app and real-time UI
-
 ## Quick run instructions
 
 ### Backend
