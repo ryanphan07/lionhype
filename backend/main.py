@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import shutil
 import uuid
@@ -7,9 +8,16 @@ from fastapi import FastAPI, File, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.config import settings
 from app.schemas.events import CommentaryResponse
 from app.services.commentary import process_video_commentary
 from app.services.video_processor import process_video
+
+logging.basicConfig(
+    level=settings.LOG_LEVEL,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+)
+logger = logging.getLogger("lionhype")
 
 app = FastAPI()
 UPLOAD_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "uploads"))
@@ -19,26 +27,32 @@ app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 @app.exception_handler(Exception)
 async def global_exception_handler(_, exc: Exception):
+    logger.error("Unhandled exception", exc_info=exc)
     return JSONResponse(status_code=500, content={"detail": str(exc) or "Internal server error"})
 
 
 @app.post("/api/upload")
 async def upload_video(file: UploadFile = File(...)):
-    video_id = str(uuid.uuid4())
-    base_dir = os.path.abspath(os.path.dirname(__file__))
-    upload_dir = os.path.join(base_dir, "uploads")
-    os.makedirs(upload_dir, exist_ok=True)
+    logger.info(f"Starting upload for file: {file.filename}")
+    try:
+        video_id = str(uuid.uuid4())
+        base_dir = os.path.abspath(os.path.dirname(__file__))
+        upload_dir = os.path.join(base_dir, "uploads")
+        os.makedirs(upload_dir, exist_ok=True)
 
-    safe_name = os.path.basename(file.filename or f"upload_{video_id}.mp4")
-    video_path = os.path.join(upload_dir, safe_name)
-    frame_dir = os.path.join(upload_dir, "frames", video_id)
-    os.makedirs(frame_dir, exist_ok=True)
+        safe_name = os.path.basename(file.filename or f"upload_{video_id}.mp4")
+        video_path = os.path.join(upload_dir, safe_name)
+        frame_dir = os.path.join(upload_dir, "frames", video_id)
+        os.makedirs(frame_dir, exist_ok=True)
 
-    with open(video_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        with open(video_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-    frame_paths = await process_video(video_path, frame_dir, sample_interval_sec=2)
-    return JSONResponse(content={"video_id": video_id, "video_path": video_path, "frame_paths": frame_paths})
+        frame_paths = await process_video(video_path, frame_dir, sample_interval_sec=2)
+        return JSONResponse(content={"video_id": video_id, "video_path": video_path, "frame_paths": frame_paths})
+    except Exception as exc:
+        logger.error(f"Upload failed for file: {file.filename}", exc_info=exc)
+        return JSONResponse(status_code=500, content={"detail": str(exc) or "Upload failed"})
 
 
 @app.websocket("/ws/analyze")

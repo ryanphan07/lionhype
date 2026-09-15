@@ -16,3 +16,8 @@ class Settings(BaseSettings):
     TTS_ENABLED: bool = True
     TTS_TIMEOUT: float = 10.0
     TTS_MAX_RETRIES: int = 2
+
+    LOG_LEVEL: str = "INFO"
+
+
+settings = Settings()
