@@ -1,8 +1,11 @@
-import os
 import asyncio
+import logging
+import os
 from typing import Any, Dict, List, Optional
 
 from app.config import Settings
+
+logger = logging.getLogger("lionhype.tts")
 
 try:
     from edge_tts import Communicate
@@ -19,7 +22,10 @@ async def _retry_tts_call(func, max_retries=settings.TTS_MAX_RETRIES, base_delay
         except Exception as e:
             last_exc = e
             if attempt < max_retries:
+                logger.warning("TTS call failed on attempt %d/%d: %s", attempt + 1, max_retries + 1, str(e))
                 await asyncio.sleep(base_delay * (2 ** attempt))
+            else:
+                logger.error("TTS service is unreachable after %d attempts.", max_retries + 1)
     raise last_exc
 
 

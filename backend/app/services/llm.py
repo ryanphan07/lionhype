@@ -1,9 +1,12 @@
-import json
 import asyncio
+import json
+import logging
 from typing import Any, Dict, List
 
 from app.config import Settings
 from app.schemas.events import CommentaryResponse, EventTimeline
+
+logger = logging.getLogger("lionhype.llm")
 
 try:
     from openai import AsyncOpenAI
@@ -48,7 +51,10 @@ async def _retry_llm_call(func, max_retries=settings.LLM_MAX_RETRIES, base_delay
         except Exception as e:
             last_exc = e
             if attempt < max_retries:
+                logger.warning("LLM call failed on attempt %d/%d: %s", attempt + 1, max_retries + 1, str(e))
                 await asyncio.sleep(base_delay * (2 ** attempt))
+            else:
+                logger.error("LLM service is unreachable after %d attempts.", max_retries + 1)
     raise last_exc
 
 
@@ -74,6 +80,7 @@ async def generate_event_timeline(frames: List[Dict[str, Any]]) -> List[Dict[str
                 parsed = json.loads(content)
                 commentary_items = parsed.get("commentary") or parsed.get("quips") or []
                 if commentary_items:
+                    logger.debug("Successfully parsed %d raw items.", len(commentary_items))
                     return _normalize_timeline_items(commentary_items)
             return None
 
