@@ -40,6 +40,7 @@ Features in place:
 - Concurrent TTS generation via `asyncio.gather`
 - Mapping audio URLs back to corresponding quip objects
 - Structured `CommentaryResponse` return values
+- Detailed step-by-step lifecycle logging for frame extraction, LLM timeline generation, and TTS synthesis
 
 This is the main “content pipeline” that turns extracted visual frames into final commentary items with audio.
 
@@ -51,6 +52,7 @@ Features in place:
 - Timeline normalization for both `timestamp` and `timestamp_ms` formats
 - A generated event timeline based on input frames when external services are unavailable
 - A system prompt designed for energetic lion-dance-style commentary
+- Observability logging for retry wrappers and fallback parsing
 
 The code is intentionally resilient in CI and offline environments.
 
@@ -62,6 +64,7 @@ Features in place:
 - Output path in the backend upload/audio folder
 - URL generation for playback from the app server
 - Fallback behavior if TTS dependency is missing
+- Observability logging for retry wrappers and fallback behavior
 
 #### MCP Soundboard Server
 `backend/mcp_server.py` implements a FastMCP server for LLM-driven sound effects.

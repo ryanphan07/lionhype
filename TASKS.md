@@ -46,7 +46,6 @@ Potential follow-ups include:
 ## Recommended next steps
 
 ### Priority 2: Harden backend reliability & logging
-- [ ] Add comprehensive logging across the commentary pipeline
 - [ ] Add more unit tests around failure cases and invalid video files
 
 ### Priority 4: Improve frontend UX & playback
