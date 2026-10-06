@@ -1,6 +1,8 @@
 import asyncio
+import hashlib
 import logging
 import os
+import re
 from typing import Any, Dict, List, Optional
 
 from app.config import Settings
@@ -33,10 +35,19 @@ async def generate_audio_clip(quip: Dict[str, Any], video_id: Optional[str] = No
     timestamp = float(quip.get("timestamp", 0.0))
     text = str(quip.get("text", ""))
     video_id = video_id or "default"
-    audio_dir = os.path.abspath(os.path.join("backend", "uploads", "audio", video_id))
+    
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", video_id):
+        raise ValueError(f"Invalid video_id: {video_id}")
+
+    if not text.strip():
+        logger.warning("Skipping TTS for empty text at timestamp %s", timestamp)
+        return {"timestamp": timestamp, "text": text, "audio_url": None}
+
+    audio_dir = os.path.join(settings.UPLOAD_DIR, "audio", video_id)
     os.makedirs(audio_dir, exist_ok=True)
 
-    audio_filename = f"audio_{timestamp:.2f}.mp3"
+    text_hash = hashlib.sha1(text.encode()).hexdigest()[:8]
+    audio_filename = f"audio_{timestamp:.2f}_{text_hash}.mp3"
     audio_path = os.path.join(audio_dir, audio_filename)
 
     if settings.TTS_ENABLED and Communicate is not None:
@@ -52,7 +63,7 @@ async def generate_audio_clip(quip: Dict[str, Any], video_id: Optional[str] = No
         with open(audio_path, "wb") as fake_audio:
             fake_audio.write(b"fake-audio")
 
-    audio_url = f"http://localhost:8000/uploads/audio/{video_id}/{audio_filename}"
+    audio_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/uploads/audio/{video_id}/{audio_filename}"
     return {"timestamp": timestamp, "text": text, "audio_url": audio_url}
 
 
