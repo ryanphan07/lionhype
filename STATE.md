@@ -86,6 +86,7 @@ Features in place:
 - `@app.websocket("/ws/analyze")` for real-time analysis progress
 - JSON progress messages using canonical phases: `uploading`, `extracting`, `analyzing`, `synthesizing`, `completed`, and `error`
 - Error propagation with standardized 500 JSON responses from the global exception handler
+- Background job tracking via `job_tracker` dictionary for asynchronous commentary generation
 - WebSocket disconnect handling and auto-reconnect logic on the frontend
 
 This is the main runtime entrypoint for the backend app.
