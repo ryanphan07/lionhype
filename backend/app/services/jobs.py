@@ -104,6 +104,10 @@ class JobStore:
         if not message:
             message = "Processing failed"
         job = self.get(job_id)
+        if job.status in TERMINAL:
+            job.message = message
+            job.updated_at = time.time()
+            return job
         self.update(job_id, "error", job.progress, message)
 
     def subscribe(self, job_id: str) -> asyncio.Queue:

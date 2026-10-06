@@ -4,7 +4,7 @@ import time
 import pytest
 
 from app.schemas.events import CommentaryResponse
-from app.services.jobs import JobNotFoundError, JobStore
+from app.services.jobs import Job, JobNotFoundError, JobStore
 
 
 @pytest.fixture
@@ -111,9 +111,18 @@ async def test_purge_expired_removes_only_expired_terminal_jobs(store):
     store.complete(job1.job_id, CommentaryResponse.model_construct(quips=[]))
     job1.updated_at = time.time() - 7200  # 2 hours ago
     
-    job2 = store.create("video2.mp4")
-    store.complete(job2.job_id, CommentaryResponse.model_construct(quips=[]))
-    # job2.updated_at is recent
+    # Add job2 directly to _jobs to avoid triggering purge_expired inside create()
+    job2 = Job(
+        job_id="job2", 
+        video_path="video2.mp4", 
+        status="completed", 
+        progress=100, 
+        message="Commentary ready", 
+        result=CommentaryResponse.model_construct(quips=[]), 
+        created_at=time.time(), 
+        updated_at=time.time()
+    )
+    store._jobs[job2.job_id] = job2
     
     purged = store.purge_expired()
     assert job1.job_id in purged
