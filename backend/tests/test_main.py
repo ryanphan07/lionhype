@@ -112,7 +112,8 @@ async def test_job_id_forwarded_to_tts(monkeypatch):
         return {"timestamp": quip["timestamp"], "text": quip["text"], "audio_url": "http://example.com/clip.mp3"}
     
     monkeypatch.setattr(commentary_module.video_processor_service, "extract_frames", lambda _: [{"timestamp": 0.0, "image_data": "abc"}])
-    monkeypatch.setattr(llm_module, "generate_event_timeline", lambda _: [{"timestamp": 0.0, "text": "quip"}])
+    async def fake_llm(frames): return [{"timestamp": 0.0, "text": "quip"}]
+    monkeypatch.setattr(llm_module, "generate_event_timeline", fake_llm)
     monkeypatch.setattr(tts_module, "generate_audio_clip", fake_generate_audio_clip)
 
     await commentary_module.process_video_commentary("fake.mp4", job_id="job-123")
@@ -126,7 +127,8 @@ async def test_progress_cb_receives_statuses_in_order(monkeypatch):
         statuses.append(status)
         
     monkeypatch.setattr(commentary_module.video_processor_service, "extract_frames", lambda _: [{"timestamp": 0.0, "image_data": "abc"}])
-    monkeypatch.setattr(llm_module, "generate_event_timeline", lambda _: [{"timestamp": 0.0, "text": "quip"}])
+    async def fake_llm(frames): return [{"timestamp": 0.0, "text": "quip"}]
+    monkeypatch.setattr(llm_module, "generate_event_timeline", fake_llm)
     monkeypatch.setattr(tts_module, "generate_audio_clip", lambda q, video_id=None: {"timestamp": q["timestamp"], "text": q["text"], "audio_url": "http://example.com/clip.mp3"})
 
     await commentary_module.process_video_commentary("fake.mp4", progress_cb=fake_progress_cb)
@@ -145,7 +147,8 @@ async def test_progress_cb_raises_does_not_break_pipeline(monkeypatch):
             raise RuntimeError("Callback failed")
             
     monkeypatch.setattr(commentary_module.video_processor_service, "extract_frames", lambda _: [{"timestamp": 0.0, "image_data": "abc"}])
-    monkeypatch.setattr(llm_module, "generate_event_timeline", lambda _: [{"timestamp": 0.0, "text": "quip"}])
+    async def fake_llm(frames): return [{"timestamp": 0.0, "text": "quip"}]
+    monkeypatch.setattr(llm_module, "generate_event_timeline", fake_llm)
     monkeypatch.setattr(tts_module, "generate_audio_clip", lambda q, video_id=None: {"timestamp": q["timestamp"], "text": q["text"], "audio_url": "http://example.com/clip.mp3"})
 
     result = await commentary_module.process_video_commentary("fake.mp4", progress_cb=fake_progress_cb)
@@ -167,10 +170,11 @@ async def test_one_failing_tts_call_leaves_audio_url_none(monkeypatch):
         {"timestamp": 0.0, "image_data": "abc"},
         {"timestamp": 1.0, "image_data": "def"},
     ])
-    monkeypatch.setattr(llm_module, "generate_event_timeline", lambda _: [
+    async def fake_llm(frames): return [
         {"timestamp": 0.0, "text": "quip1"},
         {"timestamp": 1.0, "text": "quip2"},
-    ])
+    ]
+    monkeypatch.setattr(llm_module, "generate_event_timeline", fake_llm)
     monkeypatch.setattr(tts_module, "generate_audio_clip", fake_generate_audio_clip)
 
     result = await commentary_module.process_video_commentary("fake.mp4")
