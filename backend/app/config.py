@@ -1,3 +1,5 @@
+import os
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,6 +20,10 @@ class Settings(BaseSettings):
     TTS_MAX_RETRIES: int = 2
 
     LOG_LEVEL: str = "INFO"
+
+    JOB_TTL_SECONDS: int = 3600
+    PUBLIC_BASE_URL: str = "http://localhost:8000"
+    UPLOAD_DIR: str = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "uploads"))
 
 
 settings = Settings()
