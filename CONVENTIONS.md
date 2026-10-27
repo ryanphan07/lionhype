@@ -1,43 +1,71 @@
-# Project Conventions & Documentation Rules
+# Project Conventions
+
+## Project context
+LionHype is a local-first app that turns lion dance videos into humorous, time-synced AI commentary with TTS audio. FastAPI backend (OpenCV frames, OpenAI-compatible multimodal LLM, edge-tts) + React/Vite frontend with WebSocket progress.
+
+Goal: a credible, honest, demoable MVP for a resume (upload a clip of 90s or less, see progress, get commentary with non-overlapping audio, run locally in a few commands). Do not add features beyond `docs/AUDIT.md` and `TASKS.md` without asking.
+
+## Environment
+- Windows + PowerShell. Native run; Docker is untested and not part of the MVP.
+- LLM: llama-server (OpenAI-compatible) at `http://127.0.0.1:8080/v1`, Qwen3.6-35B-A3B with `--mmproj`. Configure via `backend/.env`.
+- TTS: edge-tts (needs internet).
+- All settings come from the single shared `settings` object in `backend/app/config.py`. No hardcoded URLs or paths elsewhere.
+
+## Commands
+(If any of these is wrong, fix this section.)
+- Backend tests: `pytest backend/tests -q`
+- Backend run: `cd backend` then `uvicorn app.main:app --port 8000`
+- Frontend: `cd frontend` then `npm run lint`, `npm run build`, `npm run dev`
 
 ## Documentation
-1. **Documentation Updates**: Whenever you modify API routes, update status flows, add validation, or alter backend services, update `README.md` to reflect the changes.
-2. **Current Capabilities Sync**: Keep the "What is already implemented" and "What is missing or incomplete" sections in `README.md` accurate after every code change.
-   > Note: this file is loaded read-only and is not always enough on its own to trigger doc updates — prompts that change routes, status flows, or services should explicitly include "update README.md per CONVENTIONS.md" as a numbered step.
+- Update docs once at the end of each work session, not after every edit:
+  - `STATE.md`: what is implemented
+  - `TASKS.md`: what is missing or next
+  - `README.md`: what it is, architecture, quickstart, route list, known limitations
+- Docs must match the code. Mark anything unverified as untested.
+- No pasted chat text, citation markers, or meta commentary in docs.
 
-## WebSocket Message Contract
-All `/ws/analyze` messages from backend to frontend use this shape:
-```json
-{
-  "status": "uploading" | "extracting" | "analyzing" | "synthesizing" | "completed" | "error",
-  "progress": 0-100,
-  "message": "optional human-readable detail, required when status is 'error'"
-}
-```
-- The field is always `status` — do not also check `msg.phase` or fall back to `msg.message` for the phase value.
-- Frontend listeners should switch on `msg.status` directly.
+## API & WebSocket Contract
+- `POST /api/upload` returns JSON including `job_id`. The job runs in the background.
+- `WS /ws/analyze/{job_id}` is server-to-client only. Every message is:
+  ```json
+  {
+    "status": "uploading" | "extracting" | "analyzing" | "synthesizing" | "completed" | "error",
+    "progress": 0-100,
+    "message": "optional human-readable detail, required when status is 'error'"
+  }
+  ```
+- On subscribe the server sends the current state first, so reconnects are safe. Unknown job: send an error message, close with code 4404.
+- The `completed` message carries no result. Fetch it from `GET /api/jobs/{job_id}`, which returns `{job_id, status, progress, message, result}`.
+- Frontend listeners switch on `msg.status` only (never `msg.phase`, never fall back to `msg.message`).
+- HTTP errors: `HTTPException` with `{"detail": "<clear message>"}`.
 
 ## Canonical Processing Phases
-The full, ordered list of phases used across frontend and backend:
 ```
 idle -> uploading -> extracting -> analyzing -> synthesizing -> completed
                                                                -> error
 ```
-- Use these exact strings everywhere (state values, WebSocket payloads, UI labels). Don't introduce new phase names or reorder without updating this list.
+- `idle` exists only as the frontend's initial state; the backend never sends it.
+- Use these exact strings everywhere (state values, WebSocket payloads, UI labels). Don't add or reorder phases without updating this list.
+
+## Backend Rules
+- Any upload/processing failure must delete the job's temporary/uploaded files before raising or finishing.
+- Client-facing error messages are generic. Log details server-side with `logger.exception`. Never log base64 frame data or secrets.
+- Never trust client-supplied paths. The server owns all file paths. `job_id` is the `video_id` for storage (video, frames, audio).
+- Serve only the audio folder statically, never raw videos.
+- Validation (filename sanitization, extension/size/duration limits, corruption checks) happens before a write is considered final.
+
+## Testing
+- Tests assert behavior. Mock only external boundaries (LLM client, TTS, OpenCV I/O), not the logic under test.
+- Run backend tests and frontend lint/build before every commit. One logical change per commit.
 
 ## Library / API Pins
 - **react-toastify**: use string literals for position, e.g. `toast.error(msg, { position: "top-right" })`. Do NOT use `toast.POSITION.TOP_RIGHT` (deprecated).
-- (Add further pins here as they come up — package name, the deprecated/wrong pattern to avoid, and the correct one.)
-
-## Backend Error & Cleanup Pattern
-- Any upload/processing failure path must delete temporary/uploaded files before raising.
-- Raise `HTTPException` with a JSON body shaped as `{"detail": "<clear message>"}`.
-- Validation (filename sanitization, extension/size limits, corruption checks) happens before any file write is considered final.
 
 ## File & Folder Layout
-- Backend business logic / processing helpers: `backend/app/services/`
-- Backend routes/entrypoints: `backend/app/main.py`
-- Backend tests: `backend/tests/`
-- Frontend components: `frontend/src/components/`
-- Frontend top-level app/state: `frontend/src/App.jsx`
-- (Fill in additional paths as the project grows — new service modules, new component subfolders, etc.)
+- Backend routes/entrypoint: `backend/app/main.py`
+- Backend services: `backend/app/services/` (e.g. `jobs.py`, `commentary.py`, `llm.py`, `tts.py`, `video_processor.py`)
+- Backend settings/schemas: `backend/app/config.py`, `backend/app/schemas/`
+- Backend tests: `backend/tests/`; dev scripts: `backend/scripts/`
+- Frontend app/state: `frontend/src/App.jsx`; components: `frontend/src/components/`
+- Docs: `README.md`, `STATE.md`, `TASKS.md`, `docs/AUDIT.md`
