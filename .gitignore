@@ -17,7 +17,8 @@ frontend/node_modules/
 frontend/dist/
 .aider*
 
-.aider*
-
 repomix-output.xml
+
+.history/,
+**/.history/
 repomix-output.xml
