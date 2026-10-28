@@ -15,6 +15,11 @@ except ImportError:  # pragma: no cover
     Communicate = None
 
 try:
+    import aiohttp
+except ImportError:  # pragma: no cover
+    aiohttp = None
+
+try:
     from mutagen.mp3 import MP3
 except ImportError:  # pragma: no cover
     MP3 = None
@@ -32,6 +37,18 @@ def measure_duration(path: str) -> Optional[float]:
         logger.warning("Could not measure duration of %s", path, exc_info=True)
         return None
     return length if length > 0 else None
+
+
+def _is_transient(exc: BaseException) -> bool:
+    """Timeouts and dropped connections are worth one more try; auth failures and bad requests are not."""
+    if isinstance(exc, (asyncio.TimeoutError, ConnectionError)):
+        return True
+    if aiohttp is not None:
+        if isinstance(exc, aiohttp.ClientResponseError):
+            return exc.status >= 500
+        if isinstance(exc, aiohttp.ClientConnectionError):
+            return True
+    return False
 
 
 def _remove_quietly(path: str) -> None:
@@ -75,15 +92,22 @@ async def generate_audio_clip(quip: Dict[str, Any], video_id: Optional[str] = No
     audio_filename = f"audio_{timestamp:.2f}_{text_hash}.mp3"
     audio_path = os.path.join(audio_dir, audio_filename)
 
-    try:
-        communicate = Communicate(text, settings.TTS_VOICE, rate=settings.TTS_RATE)
-        await asyncio.wait_for(communicate.save(audio_path), timeout=settings.TTS_TIMEOUT_SECONDS)
-        if not os.path.exists(audio_path) or os.path.getsize(audio_path) < MIN_AUDIO_BYTES:
-            raise RuntimeError("TTS produced an empty or tiny file")
-    except Exception as e:
-        logger.warning("TTS failed for t=%.2f: %s", timestamp, e or type(e).__name__)
-        _remove_quietly(audio_path)
-        return None
+    attempts = 1 + max(0, settings.TTS_RETRIES)
+    for attempt in range(1, attempts + 1):
+        try:
+            communicate = Communicate(text, settings.TTS_VOICE, rate=settings.TTS_RATE)
+            await asyncio.wait_for(communicate.save(audio_path), timeout=settings.TTS_TIMEOUT_SECONDS)
+            if not os.path.exists(audio_path) or os.path.getsize(audio_path) < MIN_AUDIO_BYTES:
+                raise RuntimeError("TTS produced an empty or tiny file")
+            break
+        except Exception as e:
+            _remove_quietly(audio_path)
+            if attempt < attempts and _is_transient(e):
+                logger.warning("TTS attempt %d failed for t=%.2f (%s); retrying", attempt, timestamp, e or type(e).__name__)
+                await asyncio.sleep(settings.TTS_RETRY_DELAY_SECONDS)
+                continue
+            logger.warning("TTS failed for t=%.2f: %s", timestamp, e or type(e).__name__)
+            return None
 
     duration = measure_duration(audio_path)
     if duration is None:

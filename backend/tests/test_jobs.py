@@ -171,3 +171,14 @@ def test_stale_running_job_is_failed_and_stops_blocking(store, monkeypatch):
     monkeypatch.setattr(jobs_module.time, "time", lambda: job.updated_at + settings.JOB_STALE_SECONDS + 1)
     assert store.has_active() is False
     assert job.status == "error" and job.message == "Processing timed out"
+
+
+@pytest.mark.anyio
+async def test_stale_job_cancels_its_pipeline_task(store, monkeypatch):
+    job = store.create("video.mp4")
+    task = asyncio.create_task(asyncio.sleep(60))
+    store.register_task(job.job_id, task)
+    monkeypatch.setattr(jobs_module.time, "time", lambda: job.updated_at + settings.JOB_STALE_SECONDS + 1)
+    assert store.has_active() is False
+    await asyncio.gather(task, return_exceptions=True)
+    assert task.cancelled()

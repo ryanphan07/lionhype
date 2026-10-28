@@ -46,6 +46,11 @@ class JobStore:
     def __init__(self):
         self._jobs: dict[str, Job] = {}
         self._subscribers: dict[str, list[asyncio.Queue]] = {}
+        self._tasks: dict[str, asyncio.Task] = {}
+
+    def register_task(self, job_id: str, task: asyncio.Task) -> None:
+        self._tasks[job_id] = task
+        task.add_done_callback(lambda _: self._tasks.pop(job_id, None))
 
     def create(self, video_path: str, job_id: Optional[str] = None) -> Job:
         self.purge_expired()
@@ -134,6 +139,9 @@ class JobStore:
             if job.status not in TERMINAL and now - job.updated_at > settings.JOB_STALE_SECONDS:
                 logger.warning("Job %s made no progress for %ds; marking it failed", job.job_id, settings.JOB_STALE_SECONDS)
                 self.fail(job.job_id, "Processing timed out")
+                task = self._tasks.pop(job.job_id, None)
+                if task is not None:
+                    task.cancel()
         return any(job.status not in TERMINAL for job in self._jobs.values())
 
     def video_paths(self) -> dict[str, str]:

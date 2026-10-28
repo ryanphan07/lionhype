@@ -28,12 +28,18 @@ def files_in(d):
 class FakeCommunicate:
     behavior = "ok"
     calls = []
+    attempts = 0
 
     def __init__(self, text, voice, rate=None):
         FakeCommunicate.calls.append((text, voice, rate))
 
     async def save(self, path):
         b = FakeCommunicate.behavior
+        if b in ("flaky", "flaky_auth"):
+            FakeCommunicate.attempts += 1
+            if FakeCommunicate.attempts == 1:
+                raise ConnectionResetError("reset") if b == "flaky" else PermissionError("401")
+            b = "ok"
         if b == "boom":
             with open(path, "wb") as f:
                 f.write(BIG)  # partial output before the failure
@@ -48,6 +54,8 @@ class FakeCommunicate:
 def fake_edge(monkeypatch):
     FakeCommunicate.behavior = "ok"
     FakeCommunicate.calls = []
+    FakeCommunicate.attempts = 0
+    monkeypatch.setattr(settings, "TTS_RETRY_DELAY_SECONDS", 0)
     monkeypatch.setattr(tts_module, "Communicate", FakeCommunicate)
     monkeypatch.setattr(tts_module, "measure_duration", lambda p: 1.5)
     return FakeCommunicate
@@ -69,6 +77,35 @@ async def test_tts_failure_returns_none_and_leaves_no_file(audio_dir, fake_edge,
     out = await tts_module.generate_audio_clip({"timestamp": 2.0, "text": "hello"}, video_id="job1")
     assert out is None
     assert files_in(audio_dir) == []
+
+
+@pytest.mark.anyio
+async def test_tts_retries_a_transient_failure_once(audio_dir, fake_edge):
+    fake_edge.behavior = "flaky"
+    out = await tts_module.generate_audio_clip({"timestamp": 2.0, "text": "hello"}, video_id="job1")
+    assert out is not None and fake_edge.attempts == 2
+    assert len(files_in(audio_dir)) == 1
+
+
+@pytest.mark.anyio
+async def test_tts_does_not_retry_when_retries_is_zero(audio_dir, fake_edge, monkeypatch):
+    monkeypatch.setattr(settings, "TTS_RETRIES", 0)
+    fake_edge.behavior = "flaky"
+    assert await tts_module.generate_audio_clip({"timestamp": 2.0, "text": "hello"}, video_id="job1") is None
+    assert fake_edge.attempts == 1
+
+
+@pytest.mark.anyio
+async def test_tts_does_not_retry_auth_errors(audio_dir, fake_edge):
+    import aiohttp
+    from unittest.mock import MagicMock
+
+    for exc in (aiohttp.ClientResponseError(MagicMock(), (), status=403), aiohttp.ClientResponseError(MagicMock(), (), status=401)):
+        assert tts_module._is_transient(exc) is False
+    assert tts_module._is_transient(aiohttp.ClientResponseError(MagicMock(), (), status=503)) is True
+    fake_edge.behavior = "flaky_auth"
+    assert await tts_module.generate_audio_clip({"timestamp": 2.0, "text": "hello"}, video_id="job1") is None
+    assert fake_edge.attempts == 1
 
 
 @pytest.mark.anyio

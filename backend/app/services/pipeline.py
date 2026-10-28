@@ -1,5 +1,7 @@
+import asyncio
 import logging
 import os
+import re
 import shutil
 from typing import Optional
 
@@ -20,7 +22,10 @@ def friendly_error(exc: BaseException) -> str:
         import openai
     except ImportError:  # pragma: no cover
         openai = None
-    if openai is not None and isinstance(exc, (openai.APIConnectionError, openai.APIStatusError)):
+    if openai is not None and isinstance(exc, openai.APIStatusError):
+        logger.warning("LLM server returned HTTP %s", exc.status_code)
+        return "The AI model rejected the request. Check the llama-server window for details."
+    if openai is not None and isinstance(exc, openai.APIConnectionError):
         return "The AI model is not reachable or timed out. Is llama-server running?"
     if isinstance(exc, LLMOutputError):
         return "The AI model returned unusable output. Try again."
@@ -40,16 +45,25 @@ def cleanup_job_files(job_id: str, video_path: str) -> None:
         shutil.rmtree(os.path.join(settings.UPLOAD_DIR, sub, job_id), ignore_errors=True)
 
 
+_VIDEO_NAME = re.compile(r"[0-9a-f]{32}_.+")
+_AUDIO_DIR_NAME = re.compile(r"[0-9a-f]{32}")
+
+
 def sweep_uploads() -> int:
-    """Delete leftover videos and audio from earlier runs. Call at startup, when the in-memory job store is empty."""
+    """Delete leftover files this app created (`<job id>_<name>` videos, `<job id>` audio folders). Call at startup, when the in-memory job store is empty."""
     removed = 0
-    for sub in ("videos", "audio"):
+    for sub, pattern, want_dir in (("videos", _VIDEO_NAME, False), ("audio", _AUDIO_DIR_NAME, True)):
         folder = os.path.join(settings.UPLOAD_DIR, sub)
         if not os.path.isdir(folder):
             continue
         for entry in os.scandir(folder):
+            if not pattern.fullmatch(entry.name):
+                continue
             try:
-                if entry.is_dir(follow_symlinks=False):
+                is_dir = entry.is_dir(follow_symlinks=False)
+                if is_dir != want_dir:
+                    continue
+                if is_dir:
                     shutil.rmtree(entry.path)
                 else:
                     os.remove(entry.path)
@@ -62,6 +76,9 @@ def sweep_uploads() -> int:
 
 
 async def run_pipeline(job_id: str, video_path: str) -> None:
+    task = asyncio.current_task()
+    if task is not None:
+        job_store.register_task(job_id, task)
     async def progress_cb(status: str, progress: int, message: Optional[str] = None) -> None:
         try:
             job_store.update(job_id, status, progress, message)
@@ -75,6 +92,10 @@ async def run_pipeline(job_id: str, video_path: str) -> None:
             os.remove(video_path)  # the browser plays its own copy; nothing reads the source again
         except OSError:
             logger.warning("Could not delete video for job %s", job_id)
+    except asyncio.CancelledError:
+        logger.warning("Pipeline for job %s was cancelled", job_id)
+        cleanup_job_files(job_id, video_path)
+        raise
     except Exception as exc:
         logger.exception("Commentary generation failed for job %s", job_id)
         try:

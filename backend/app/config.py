@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     TTS_ENABLED: bool = True
     TTS_TIMEOUT_SECONDS: float = 30.0
     TTS_CONCURRENCY: int = 4
+    TTS_RETRIES: int = 1  # extra tries after a transient failure (timeout, dropped connection)
+    TTS_RETRY_DELAY_SECONDS: float = 1.0
     MAX_SHIFT_SEC: float = 2.0
 
     LOG_LEVEL: str = "INFO"

@@ -297,15 +297,23 @@ def test_validate_upload_size_limit_is_a_setting(monkeypatch):
         vp.validate_upload_metadata("a.mp4", 1024 * 1024 + 1)
 
 
-def test_startup_sweep_removes_leftovers(tmp_path, monkeypatch):
+def test_startup_sweep_removes_only_app_created_files(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "UPLOAD_DIR", str(tmp_path))
+    job = "a" * 32
     (tmp_path / "videos").mkdir()
-    (tmp_path / "videos" / "old.mp4").write_bytes(b"x")
-    (tmp_path / "audio" / "job1").mkdir(parents=True)
-    (tmp_path / "audio" / "job1" / "a.mp3").write_bytes(b"fake-audio")
+    (tmp_path / "videos" / f"{job}_old.mp4").write_bytes(b"x")
+    (tmp_path / "videos" / "holiday.mp4").write_bytes(b"mine")
+    (tmp_path / "videos" / ("b" * 32)).mkdir()  # a directory, not a video
+    (tmp_path / "audio" / job).mkdir(parents=True)
+    (tmp_path / "audio" / job / "a.mp3").write_bytes(b"fake-audio")
+    (tmp_path / "audio" / "my-music").mkdir()
+    (tmp_path / "audio" / "my-music" / "song.mp3").write_bytes(b"mine")
+    (tmp_path / "audio" / "notes.txt").write_text("mine")
     from app.services.pipeline import sweep_uploads
     assert sweep_uploads() == 2
-    assert os.listdir(tmp_path / "videos") == [] and os.listdir(tmp_path / "audio") == []
+    assert sorted(os.listdir(tmp_path / "videos")) == ["b" * 32, "holiday.mp4"]
+    assert sorted(os.listdir(tmp_path / "audio")) == ["my-music", "notes.txt"]
+    assert (tmp_path / "audio" / "my-music" / "song.mp3").exists()
 
 
 def test_second_upload_while_a_job_runs_is_rejected(client, upload_dir, video_bytes, fake_ai):
@@ -331,6 +339,9 @@ def test_friendly_error_categories():
     req = httpx.Request("POST", "http://x")
     assert "not reachable" in friendly_error(openai.APIConnectionError(request=req))
     assert "not reachable" in friendly_error(openai.APITimeoutError(request=req))
+    resp = httpx.Response(500, request=req)
+    rejected = friendly_error(openai.InternalServerError("boom 500", response=resp, body=None))
+    assert rejected.startswith("The AI model rejected the request") and "500" not in rejected
     assert "unusable output" in friendly_error(LLMOutputError("bad json"))
     assert "video" in friendly_error(ValueError("No frames"))
     assert friendly_error(RuntimeError("secret")) == GENERIC_FAILURE

@@ -122,7 +122,16 @@ async def process_video_commentary(
                 logger.warning("TTS failed for t=%.2f: %s", quip["timestamp"], e)
                 return None
 
-    results = await asyncio.gather(*(_safe_generate_audio(q) for q in normalized_quips))
+    finished = 0
+
+    async def _counted(quip: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        nonlocal finished
+        result = await _safe_generate_audio(quip)
+        finished += 1
+        await _report("synthesizing", 70 + int(20 * finished / len(normalized_quips)))
+        return result
+
+    results = await asyncio.gather(*(_counted(q) for q in normalized_quips))
     await _report("synthesizing", 90)
 
     with_audio: List[Dict[str, Any]] = []
