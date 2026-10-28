@@ -9,6 +9,8 @@ const WS_BASE = API_BASE.replace(/^http/, 'ws');
 
 const MAX_RECONNECTS = 5;
 const MAX_BACKOFF_MS = 10000;
+const POLL_INTERVAL_MS = 5000;
+const MAX_POLL_FAILURES = 60; // about 5 minutes without reaching the server
 
 const PHASE_LABELS = {
   uploading: 'Uploading',
@@ -35,6 +37,7 @@ function App() {
 
   const socketRef = useRef(null);
   const reconnectTimerRef = useRef(null);
+  const pollTimerRef = useRef(null);
   const attemptsRef = useRef(0);
   const jobIdRef = useRef(null);
   const terminalRef = useRef(false);
@@ -45,6 +48,8 @@ function App() {
     closedRef.current = true;
     clearTimeout(reconnectTimerRef.current);
     reconnectTimerRef.current = null;
+    clearTimeout(pollTimerRef.current);
+    pollTimerRef.current = null;
     const socket = socketRef.current;
     socketRef.current = null;
     if (socket) {
@@ -73,6 +78,44 @@ function App() {
       fail(errorDetail(error, 'Failed to fetch the commentary result.'));
     }
   }, [fail]);
+
+  // Long jobs outlive a flaky WebSocket: once reconnects are exhausted, keep asking the server for the job state.
+  const startPolling = useCallback((jobId) => {
+    let failures = 0;
+    const poll = async () => {
+      if (closedRef.current || terminalRef.current || jobIdRef.current !== jobId) return;
+      try {
+        const { data } = await axios.get(`${API_BASE}/api/jobs/${jobId}`);
+        if (closedRef.current || terminalRef.current || jobIdRef.current !== jobId) return;
+        failures = 0;
+        if (data.status === 'completed') {
+          terminalRef.current = true;
+          setStatusMessage(data.message || '');
+          fetchResult(jobId);
+          return;
+        }
+        if (data.status === 'error') {
+          fail(data.message || 'Video analysis failed.');
+          return;
+        }
+        setProcessingStatus(data.status);
+        setProgress(data.progress ?? 0);
+        setStatusMessage(data.message || '');
+      } catch (error) {
+        if (error?.response?.status === 404) {
+          fail('The server no longer has this job (it may have restarted).');
+          return;
+        }
+        failures += 1;
+        if (failures >= MAX_POLL_FAILURES) {
+          fail('Lost connection to the server.');
+          return;
+        }
+      }
+      pollTimerRef.current = setTimeout(poll, POLL_INTERVAL_MS);
+    };
+    poll();
+  }, [fail, fetchResult]);
 
   const connectSocket = useCallback((jobId) => {
     const open = () => {
@@ -104,7 +147,8 @@ function App() {
       socket.onclose = () => {
         if (closedRef.current || terminalRef.current || socketRef.current !== socket) return;
         if (attemptsRef.current >= MAX_RECONNECTS) {
-          fail('Lost connection to the server.');
+          setStatusMessage('Live updates lost, checking the server every few seconds');
+          startPolling(jobId);
           return;
         }
         const delay = Math.min(1000 * 2 ** attemptsRef.current, MAX_BACKOFF_MS);
@@ -115,7 +159,7 @@ function App() {
       };
     };
     open();
-  }, [fail, fetchResult]);
+  }, [fail, fetchResult, startPolling]);
 
   useEffect(() => {
     return () => {

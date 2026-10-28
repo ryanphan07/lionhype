@@ -38,7 +38,7 @@ The browser keeps the file as a blob URL for playback; the server never serves v
 - Removed earlier: `/api/commentary/*`, presigned/boto3 endpoint, `backend/main.py`, `mcp_server.py`, canned LLM output, fake audio, 224x224 JSON-text frames.
 
 ## Frontend (`frontend/src/`)
-- `App.jsx`: upload via axios, then `WS /ws/analyze/{job_id}` with capped exponential reconnect (5 tries), switches on `msg.status` only, on `completed` fetches `GET /api/jobs/{id}`, shows toast + inline error, `VITE_API_BASE` (default http://localhost:8000).
+- `App.jsx`: upload via axios, then `WS /ws/analyze/{job_id}` with capped exponential reconnect (5 tries), then a 5 s polling fallback on `GET /api/jobs/{id}` (not browser-tested), switches on `msg.status` only, on `completed` fetches `GET /api/jobs/{id}`, shows toast + inline error, `VITE_API_BASE` (default http://localhost:8000).
 - `components/VideoPlayer.jsx`: blob-URL video, quip queue driven by `timeupdate`, one clip at a time, video ducked to 0.3 while a clip plays, stale lines (older than 4 s) skipped, seek resets, pause/resume handled, autoplay-block notice, "audio unavailable" notice, clickable commentary list that seeks.
 - Lint and build pass. No frontend tests. Browser behavior (progress, sync, seek) has not been re-verified since session 6.
 
@@ -53,7 +53,7 @@ The browser keeps the file as a blob URL for playback; the server never serves v
 - edge-tts must be >= 7.3.1 (7.2.8 gets 403).
 
 ## Known gaps for long clips (audit 3)
-The pipeline handles long clips by limits only. Not yet robust: no polling fallback when the WebSocket drops, all-or-nothing results. (SDK retries, the stuck lock and generic errors were fixed in session 11.) See TASKS session 11 and DECISIONS D4.
+The pipeline handles long clips by limits only. Not yet robust: all-or-nothing results (D4), no resume after a page refresh. (SDK retries, the stuck lock and generic errors were fixed in session 11.) See TASKS session 11 and DECISIONS D4.
 
 ## Maturity
 Local-first prototype that runs end to end with no fake output. Not hardened: single in-memory job store, no auth, no queue, unpinned dependencies, one unofficial TTS endpoint. Honest and demoable once the README/GIF exist and real-footage runs are done (timing defects F1-F3 are fixed in code, not yet re-run live).
