@@ -114,8 +114,20 @@ async def process_video_commentary(
     await _report("synthesizing", 70)
     semaphore = asyncio.Semaphore(settings.TTS_CONCURRENCY)
 
+    start_lock = asyncio.Lock()
+    last_start = 0.0
+
+    async def _stagger() -> None:
+        nonlocal last_start
+        async with start_lock:
+            wait = last_start + settings.TTS_START_STAGGER_SECONDS - time.monotonic()
+            if wait > 0:
+                await asyncio.sleep(wait)
+            last_start = time.monotonic()
+
     async def _safe_generate_audio(quip: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         async with semaphore:
+            await _stagger()
             try:
                 return await tts_service.generate_audio_clip(quip, video_id=video_id)
             except Exception as e:

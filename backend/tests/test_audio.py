@@ -1,7 +1,10 @@
 import asyncio
 import os
+from unittest.mock import MagicMock
 
+import aiohttp
 import pytest
+from edge_tts.exceptions import NoAudioReceived
 
 from app.config import settings
 from app.schemas.events import CommentaryResponse
@@ -35,9 +38,13 @@ class FakeCommunicate:
 
     async def save(self, path):
         b = FakeCommunicate.behavior
-        if b in ("flaky", "flaky_auth"):
+        if b in ("flaky", "flaky_auth", "no_audio", "forbidden"):
             FakeCommunicate.attempts += 1
+            if b == "forbidden":
+                raise aiohttp.ClientResponseError(MagicMock(), (), status=403)
             if FakeCommunicate.attempts == 1:
+                if b == "no_audio":
+                    raise NoAudioReceived("No audio was received.")
                 raise ConnectionResetError("reset") if b == "flaky" else PermissionError("401")
             b = "ok"
         if b == "boom":
@@ -106,6 +113,51 @@ async def test_tts_does_not_retry_auth_errors(audio_dir, fake_edge):
     fake_edge.behavior = "flaky_auth"
     assert await tts_module.generate_audio_clip({"timestamp": 2.0, "text": "hello"}, video_id="job1") is None
     assert fake_edge.attempts == 1
+
+
+@pytest.mark.anyio
+async def test_tts_retries_no_audio_received_once_then_succeeds(audio_dir, fake_edge):
+    fake_edge.behavior = "no_audio"
+    out = await tts_module.generate_audio_clip({"timestamp": 2.0, "text": "hello"}, video_id="job1")
+    assert out is not None and fake_edge.attempts == 2
+    assert len(files_in(audio_dir)) == 1
+
+
+@pytest.mark.anyio
+async def test_tts_403_is_not_retried(audio_dir, fake_edge):
+    fake_edge.behavior = "forbidden"
+    assert await tts_module.generate_audio_clip({"timestamp": 2.0, "text": "hello"}, video_id="job1") is None
+    assert fake_edge.attempts == 1
+
+
+@pytest.mark.anyio
+async def test_tts_duration_is_remeasured_once_before_failing(audio_dir, fake_edge, monkeypatch):
+    monkeypatch.setattr(tts_module, "DURATION_RECHECK_DELAY_SECONDS", 0)
+    results = iter([None, 2.5])
+    monkeypatch.setattr(tts_module, "measure_duration", lambda p: next(results))
+    out = await tts_module.generate_audio_clip({"timestamp": 2.0, "text": "hello"}, video_id="job1")
+    assert out["duration_sec"] == 2.5
+
+
+@pytest.mark.anyio
+async def test_tts_unreadable_duration_is_measured_twice_and_logged(audio_dir, fake_edge, monkeypatch, caplog):
+    monkeypatch.setattr(tts_module, "DURATION_RECHECK_DELAY_SECONDS", 0)
+    calls = []
+    monkeypatch.setattr(tts_module, "measure_duration", lambda p: calls.append(p))
+    with caplog.at_level("WARNING", logger="lionhype.tts"):
+        assert await tts_module.generate_audio_clip({"timestamp": 2.0, "text": "hello"}, video_id="job1") is None
+    assert len(calls) == 2
+    assert "first4=fffb9000" in caplog.text and "file_bytes=400" in caplog.text
+    assert files_in(audio_dir) == []
+
+
+@pytest.mark.anyio
+async def test_tts_failure_log_has_diagnostics(audio_dir, fake_edge, caplog):
+    fake_edge.behavior = "boom"
+    with caplog.at_level("WARNING", logger="lionhype.tts"):
+        await tts_module.generate_audio_clip({"timestamp": 2.0, "text": "hello"}, video_id="job1")
+    assert "RuntimeError" in caplog.text and "text_len=5" in caplog.text
+    assert settings.TTS_VOICE in caplog.text and "file_bytes=400" in caplog.text
 
 
 @pytest.mark.anyio
@@ -224,6 +276,25 @@ async def test_audio_available_false_when_all_tts_fail(monkeypatch, one_window):
     assert result.audio_available is False
     assert len(result.quips) == 2
     assert all(q.audio_url is None and q.duration_sec is None for q in result.quips)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("concurrency,expected_max", [(1, 1), (2, 2)])
+async def test_tts_concurrency_limits_parallel_calls(monkeypatch, one_window, concurrency, expected_max):
+    monkeypatch.setattr(settings, "TTS_CONCURRENCY", concurrency)
+    monkeypatch.setattr(settings, "TTS_START_STAGGER_SECONDS", 0)
+    state = {"now": 0, "max": 0}
+
+    async def slow(quip, video_id=None):
+        state["now"] += 1
+        state["max"] = max(state["max"], state["now"])
+        await asyncio.sleep(0.02)
+        state["now"] -= 1
+        return {**quip, "audio_url": "http://x/a.mp3", "duration_sec": 1.0}
+
+    monkeypatch.setattr(tts_module, "generate_audio_clip", slow)
+    await commentary_module.process_video_commentary("v.mp4")
+    assert state["max"] == expected_max
 
 
 def test_job_message_without_audio():

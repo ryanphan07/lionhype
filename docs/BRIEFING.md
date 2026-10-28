@@ -13,14 +13,14 @@ LionHype turns a lion dance video into humorous, time-synced AI commentary with 
 - Honesty rule: no canned LLM text, no fake audio. Failures are shown, not hidden.
 
 ## State (2026-10-28)
-- Implemented and tested (105 backend tests, fresh venv and `npm ci` verified, lint and build clean, 0 npm vulnerabilities): upload validation, job API (`POST /api/upload`, `GET /api/jobs/{id}`, `WS /ws/analyze/{id}`), windowed vision pipeline, TTS with measured durations, server-side overlap scheduling, categorized safe error messages, stale-job lock, startup upload sweep, polling fallback in the browser, time-left estimate.
+- Implemented and tested (112 backend tests, fresh venv and `npm ci` verified, lint and build clean, 0 npm vulnerabilities): upload validation, job API (`POST /api/upload`, `GET /api/jobs/{id}`, `WS /ws/analyze/{id}`), windowed vision pipeline, TTS with measured durations, server-side overlap scheduling, categorized safe error messages, stale-job lock, startup upload sweep, polling fallback in the browser, time-left estimate.
 - Verified live (before the latest timing changes): one 10 s window on the 9B took 44.7 s (3248 prompt tokens); real edge-tts works with edge-tts 7.3.1; an 8-word line is about 4.5 s of speech. Verified on a real server with the LLM down: the job fails in about 4 s with a clear message.
 - **Not verified since session 6:** browser behavior (progress, sync, seek, pause, polling), the timing fixes with a live model, any 10+ minute run, 35B throughput.
 - Measured cost: about 45 s per 10 s of video on the 9B, so a 10-minute clip is roughly 45 minutes.
 
 ## Decisions
 - Made: D1 long clips are a goal; D2 9B for dev, 35B for real runs; timing constants recalibrated to real speech (4.5 s gap, 3 quips and 10 words per window).
-- **Decided 2026-10-28:** D4 = A (all-or-nothing for v0.1.0; B/C after release), MIT license, Docker files deleted. Session 12 (M1-M5) done. D3 TTS fallback is deferred (edge-tts is an unofficial endpoint; an offline voice is possible later). Remaining: live session, GIF, tag.
+- **Decided 2026-10-28:** D4 = A (all-or-nothing for v0.1.0; B/C after release), MIT license, Docker files deleted. Session 12 (M1-M5) done. D3 TTS fallback is deferred (edge-tts is an unofficial endpoint; an offline voice is possible later). Session 13 (TTS hardening: retry NoAudioReceived, TTS_CONCURRENCY=1 with stagger, duration re-check, failure diagnostics, `backend/scripts/tts_check.py`) done, motivated by "No audio was received" with two clips in parallel. Remaining: live session, GIF, tag.
 
 ## Roadmap (details in `docs/TASKS.md`, owner actions in `docs/OWNER_TODO.md`)
 1. Session 12 (done): M1 sweep deletes only app-created files, M2 TTS retry, M3 LLM HTTP error text, M4 stale job tasks cancelled, M5 README note.

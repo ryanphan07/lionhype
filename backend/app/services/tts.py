@@ -11,8 +11,10 @@ logger = logging.getLogger("lionhype.tts")
 
 try:
     from edge_tts import Communicate
+    from edge_tts.exceptions import NoAudioReceived, WebSocketError
 except ImportError:  # pragma: no cover
     Communicate = None
+    NoAudioReceived = WebSocketError = None
 
 try:
     import aiohttp
@@ -25,6 +27,7 @@ except ImportError:  # pragma: no cover
     MP3 = None
 
 MIN_AUDIO_BYTES = 200
+DURATION_RECHECK_DELAY_SECONDS = 0.2
 
 
 def measure_duration(path: str) -> Optional[float]:
@@ -40,8 +43,10 @@ def measure_duration(path: str) -> Optional[float]:
 
 
 def _is_transient(exc: BaseException) -> bool:
-    """Timeouts and dropped connections are worth one more try; auth failures and bad requests are not."""
+    """Timeouts, dropped connections and empty edge-tts replies are worth one more try; auth failures and bad requests are not."""
     if isinstance(exc, (asyncio.TimeoutError, ConnectionError)):
+        return True
+    if NoAudioReceived is not None and isinstance(exc, (NoAudioReceived, WebSocketError)):
         return True
     if aiohttp is not None:
         if isinstance(exc, aiohttp.ClientResponseError):
@@ -49,6 +54,20 @@ def _is_transient(exc: BaseException) -> bool:
         if isinstance(exc, aiohttp.ClientConnectionError):
             return True
     return False
+
+
+def _file_size(path: str) -> Optional[int]:
+    try:
+        return os.path.getsize(path)
+    except OSError:
+        return None
+
+
+def _log_failure(exc: BaseException, timestamp: float, text: str, path: str) -> None:
+    logger.warning(
+        "TTS failed for t=%.2f: %s: %s (text_len=%d voice=%s rate=%s file_bytes=%s)",
+        timestamp, type(exc).__name__, exc, len(text), settings.TTS_VOICE, settings.TTS_RATE, _file_size(path),
+    )
 
 
 def _remove_quietly(path: str) -> None:
@@ -101,17 +120,29 @@ async def generate_audio_clip(quip: Dict[str, Any], video_id: Optional[str] = No
                 raise RuntimeError("TTS produced an empty or tiny file")
             break
         except Exception as e:
-            _remove_quietly(audio_path)
             if attempt < attempts and _is_transient(e):
-                logger.warning("TTS attempt %d failed for t=%.2f (%s); retrying", attempt, timestamp, e or type(e).__name__)
+                logger.warning("TTS attempt %d failed for t=%.2f (%s: %s); retrying", attempt, timestamp, type(e).__name__, e)
+                _remove_quietly(audio_path)
                 await asyncio.sleep(settings.TTS_RETRY_DELAY_SECONDS)
                 continue
-            logger.warning("TTS failed for t=%.2f: %s", timestamp, e or type(e).__name__)
+            _log_failure(e, timestamp, text, audio_path)
+            _remove_quietly(audio_path)
             return None
 
     duration = measure_duration(audio_path)
+    if duration is None:  # the file may not be fully flushed yet; look once more
+        await asyncio.sleep(DURATION_RECHECK_DELAY_SECONDS)
+        duration = measure_duration(audio_path)
     if duration is None:
-        logger.warning("Discarding audio for t=%.2f: duration unreadable", timestamp)
+        try:
+            with open(audio_path, "rb") as f:
+                head = f.read(4).hex()
+        except OSError:
+            head = "unreadable"
+        logger.warning(
+            "Discarding audio for t=%.2f: duration unreadable (text_len=%d voice=%s rate=%s file_bytes=%s first4=%s)",
+            timestamp, len(text), settings.TTS_VOICE, settings.TTS_RATE, _file_size(audio_path), head,
+        )
         _remove_quietly(audio_path)
         return None
 

@@ -28,7 +28,8 @@ class Settings(BaseSettings):
     TTS_RATE: str = "+10%"
     TTS_ENABLED: bool = True
     TTS_TIMEOUT_SECONDS: float = 30.0
-    TTS_CONCURRENCY: int = 4
+    TTS_CONCURRENCY: int = 1  # edge-tts is an unofficial endpoint; parallel calls were seen to fail
+    TTS_START_STAGGER_SECONDS: float = 0.3  # minimum gap between clip starts
     TTS_RETRIES: int = 1  # extra tries after a transient failure (timeout, dropped connection)
     TTS_RETRY_DELAY_SECONDS: float = 1.0
     MAX_SHIFT_SEC: float = 2.0
