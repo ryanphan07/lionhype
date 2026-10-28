@@ -38,7 +38,7 @@ Tags: BLOCKS-DEMO / SHOULD-FIX / POLISH / INFO. Line refs are relative to `backe
 | N7 | POLISH | **Long clips will repeat jokes.** Only the last two quip texts carry across windows, and the model's own `seen` summary is logged but discarded. Over 60 windows expect "blue lion bows" repeatedly. Passing the last 2-3 `seen` lines is a small prompt change | `services/llm.py:148`, `services/commentary.py:106-108` |
 | N8 | POLISH | **Throughput levers for long clips, none tried:** fewer or smaller frames (`FRAMES_PER_WINDOW`, `FRAME_WIDTH` 640), longer windows (20 s), fewer quips, and parallel windows with `llama-server -np 2` (requires dropping the previous-quips dependency). Cost per window is prefill (about 3.2k tokens) plus decode (about 160 tokens) | `config.py` |
 | N9 | POLISH | **CLAUDE.md contradicts the decisions:** it still says clips of 90 s or less and names only the 35B model. Owner's file, so not edited | `CLAUDE.md` |
-| N10 | POLISH | A shifted last quip can start after the video ends (not clamped after scheduling); the mp3 of a dropped quip stays until the job expires | `services/commentary.py` `schedule_quips` |
+| N10 | FIXED (session 11) | A shifted last quip can start after the video ends (not clamped after scheduling); the mp3 of a dropped quip stays until the job expires | `services/commentary.py` `schedule_quips` |
 | N11 | INFO | Still open from audit 2: F7 (edge-tts is an unofficial endpoint), F9 (Docker files stale; deletion needs your OK), F12 (partly), F13, F14 (volume ducking, timeupdate jitter), F16, F17, no LICENSE | see history below |
 
 ## Verified good this time

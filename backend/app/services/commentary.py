@@ -41,7 +41,7 @@ def analyzing_message(index: int, total: int, avg_window_sec: Optional[float]) -
     return message
 
 
-def schedule_quips(quips: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def schedule_quips(quips: List[Dict[str, Any]], video_duration: Optional[float] = None) -> List[Dict[str, Any]]:
     """Keep spoken quips from overlapping: shift late by up to MAX_SHIFT_SEC, else drop. Quips without audio never block."""
     result: List[Dict[str, Any]] = []
     audio_end: Optional[float] = None
@@ -52,8 +52,8 @@ def schedule_quips(quips: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             if audio_end is not None and start < audio_end + AUDIO_GAP_SEC:
                 new_start = audio_end + AUDIO_GAP_SEC
                 shift = new_start - start
-                if shift > settings.MAX_SHIFT_SEC:
-                    logger.warning("Dropping quip at t=%.2f: would need a %.2fs shift (max %.2fs)", start, shift, settings.MAX_SHIFT_SEC)
+                if shift > settings.MAX_SHIFT_SEC or (video_duration is not None and new_start >= video_duration):
+                    logger.warning("Dropping quip at t=%.2f: would need a %.2fs shift (max %.2fs) or start after the video ends", start, shift, settings.MAX_SHIFT_SEC)
                     continue
                 logger.info("Shifting quip from t=%.2f to t=%.2f to avoid audio overlap", start, new_start)
                 quip["timestamp"] = start = round(new_start, 2)
@@ -132,7 +132,11 @@ async def process_video_commentary(
         payload["duration_sec"] = result.get("duration_sec") if result and payload["audio_url"] else None
         with_audio.append(payload)
 
-    scheduled = schedule_quips(with_audio)
+    scheduled = schedule_quips(with_audio, duration)
+    kept_urls = {q["audio_url"] for q in scheduled if q["audio_url"]}
+    for q in with_audio:
+        if q["audio_url"] and q["audio_url"] not in kept_urls:
+            tts_service.remove_clip_file(video_id, q["audio_url"])
     audio_available = any(q["audio_url"] for q in scheduled)
     if not audio_available:
         logger.error("No audio clips available for video_id: %s", video_id)

@@ -218,3 +218,37 @@ def test_analyzing_message_estimates_time_left():
     assert msg(0, 6, None) == "Analyzing part 1 of 6"
     assert msg(1, 6, 45.0) == "Analyzing part 2 of 6, about 4 min left"
     assert msg(5, 6, 20.0) == "Analyzing part 6 of 6, under a minute left"
+
+
+def test_schedule_drops_quip_shifted_past_video_end():
+    out = commentary_module.schedule_quips([aq(0.0, 4.0), aq(3.9)], video_duration=4.2)
+    assert times(out) == [0.0]
+    assert times(commentary_module.schedule_quips([aq(0.0, 4.0), aq(3.9)], video_duration=60.0)) == [0.0, pytest.approx(4.3)]
+
+
+def test_remove_clip_file_deletes_only_mp3_in_job_folder(audio_dir):
+    audio_dir.mkdir(parents=True)
+    clip = audio_dir / "audio_1.00_ab12cd34.mp3"
+    other = audio_dir / "keep.txt"
+    clip.write_bytes(BIG)
+    other.write_text("x")
+    tts_module.remove_clip_file("job1", "http://localhost:8000/uploads/audio/job1/audio_1.00_ab12cd34.mp3")
+    tts_module.remove_clip_file("job1", "http://x/../../keep.txt")
+    tts_module.remove_clip_file("../evil", "http://x/a.mp3")
+    assert not clip.exists() and other.exists()
+
+
+@pytest.mark.anyio
+async def test_dropped_quip_audio_file_is_deleted(monkeypatch, one_window, audio_dir):
+    audio_dir.mkdir(parents=True)
+    monkeypatch.setattr(settings, "MAX_SHIFT_SEC", 0.1)
+
+    async def clip(quip, video_id=None):
+        name = f"audio_{quip['timestamp']:.2f}_aaaaaaaa.mp3"
+        (audio_dir / name).write_bytes(BIG)
+        return {**quip, "audio_url": f"http://x/uploads/audio/job1/{name}", "duration_sec": 6.0}
+
+    monkeypatch.setattr(tts_module, "generate_audio_clip", clip)
+    result = await commentary_module.process_video_commentary("v.mp4", job_id="job1")
+    assert [q.timestamp for q in result.quips] == [1.0]
+    assert sorted(os.listdir(audio_dir)) == ["audio_1.00_aaaaaaaa.mp3"]

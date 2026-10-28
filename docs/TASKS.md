@@ -13,7 +13,7 @@ Goal: a credible, honest, demoable resume MVP, shipped fast. Items are tagged wi
 - [x] N6: `has_active()` fails jobs with no progress update for `JOB_STALE_SECONDS` (1800) so uploads unblock (tested with a fake clock). Note: the TTS phase only reports at 70 and 90 percent, so a very slow TTS stage over 30 min would be cut off; per-clip progress is a possible follow-up.
 - [x] N4: `pipeline.friendly_error` maps failures to safe messages (model unreachable/timeout, unusable model output, video could not be processed, else the generic text); detail stays in the server log (tested). "No usable commentary" is now an `LLMOutputError`.
 - [ ] N1: frontend: when the WebSocket is lost, fall back to polling `GET /api/jobs/{id}` every 5 s until terminal (no 5-try limit); keep `job_id` in sessionStorage so a refresh can resume status (the video blob needs re-selecting; show that).
-- [ ] N10: clamp shifted timestamps to the video duration; delete the mp3 of a dropped quip.
+- [x] N10: a quip that would start at or after the video end is dropped (`schedule_quips(quips, video_duration)`); mp3s of dropped quips are deleted (`tts.remove_clip_file`, tested).
 - [ ] N7 (optional, prompt-level): pass the last 2-3 `seen` summaries to the next window to reduce repetition on long clips.
 
 ## Decision before long-clip testing: D4 (see DECISIONS.md)
