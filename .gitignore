@@ -1,4 +1,4 @@
-﻿# Python
+# Python
 backend/venv/
 backend/__pycache__/
 backend/app/__pycache__/
@@ -18,7 +18,5 @@ frontend/dist/
 .aider*
 
 repomix-output.xml
-
-.history/,
+.history/
 **/.history/
-repomix-output.xml
