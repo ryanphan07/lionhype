@@ -1,35 +1,33 @@
-# Handoff: Session 4 (frontend rewire + playback)
+# Handoff: Session 5 (vision path)
 
 ## 1. Done
-- frontend/src/App.jsx: upload -> job_id -> WS /ws/analyze/{job_id} (WS_BASE from VITE_API_BASE); progress bar with phase label + message; `errorMessage` shown in an alert box plus toast; on "completed" GET /api/jobs/{id} and set quips; HTTP `detail` shown in toasts. Reconnect: only if not intentionally closed/terminal, max 5, backoff 1s*2^n capped 10s, counter reset on any message. Socket, timers, object URL cleaned on unmount; previous socket closed on new upload. Local file played via createObjectURL, revoked on replace/unmount. File input disabled while a job runs.
-- frontend/src/components/VideoPlayer.jsx: rewritten. Serial audio queue, items >4s stale skipped, video volume 0.3 while commentary plays then restored, audio pauses/resumes with video, seek clears queue and played state, active quip highlighted, click quip seeks, quip 0 now plays, null audio_url shows text "(no audio)", autoplay rejection shows a notice.
-- Removed src/App.css (unused, not imported) and lucide-react (package.json, lock).
+- config.py / .env.example: LLM_TIMEOUT 300, LLM_ENABLE_THINKING, LLM_MAX_TOKENS 500, WINDOW_SECONDS 10, FRAMES_PER_WINDOW 6, FRAME_WIDTH 896, MAX_QUIPS_PER_WINDOW 4, MIN_QUIP_GAP_SEC 2.5, QUIP_WORDS_PER_SECOND 2.5, MAX_VIDEO_SECONDS 60. Removed LLM_ENABLED and LLM_MAX_RETRIES.
+- services/video_processor.py: `motion_box` (moved), `compute_crop_box` (once per video, logs box), `plan_windows`, `frame_count_for_window`, `sample_window_frames` (same box for all frames, INTER_AREA resize to FRAME_WIDTH). Old `extract_frames` removed.
+- services/llm.py rewritten: `analyze_window` (system prompt first, text+image_url parts, images last, enable_thinking via chat_template_kwargs, `<think>` stripped, tolerant JSON parse, one retry with JSON nudge, INFO log of frames/prompt_tokens/completion_tokens/seconds). Canned fallback, old retry wrapper, `generate_commentary` removed.
+- services/commentary.py: windowed sequential loop with "Analyzing part i of n", previous 2 quips passed on, `finalize_timeline` (sort, clamp, 2.5s gap across windows, word budget, min 3, last 14), total pipeline time logged.
+- Tests: new tests/test_vision.py; test_main.py and test_api.py moved to the new functions. docs/CONVENTIONS.md (llama-server command, settings, test count), docs/STATE.md (one line).
 
 ## 2. Decisions and deviations
-- Removed the per-quip <audio controls> elements: they bypassed the no-overlap queue.
-- VideoPlayer gets `key={videoUrl}` so state resets per upload (avoids setState in effect).
-- Reconnect logic is nested in `connectSocket` (react-hooks lint forbids self-reference).
-- Heading changed to "LionHype"; removed the extra "Phase" box and spinner (replaced by the label).
-- index.css (template vars/styles) and src/assets/* left untouched; not asked.
-- Committed once; nothing pushed.
+- **backend/app/prompts/commentary_system.txt does not exist in the repo.** Not written by me. The loader raises FileNotFoundError, so every job errors until you add it. Tests use a temp prompt.
+- Transport errors/timeouts are not retried (a retry would double a 300s wait); only unusable JSON gets the one retry.
+- A video with zero usable quips overall now errors ("no usable commentary") instead of completing empty.
+- A tail window under 2s is merged into the previous window.
+- Quips are not clamped to their window, only to the video duration, as specified.
+- vision_spike.py left untouched (your uncommitted edits) and still has its own motion_box copy.
 
 ## 3. Results
-- npm run lint: PASS. npm run build: PASS. pytest backend/tests -q: 39 passed.
+- pytest backend/tests -q: 70 passed. Frontend not touched (lint/build not rerun).
 
-## 4. Not verified, test manually (backend on :8000, llama-server on :8080, npm run dev)
-1. Upload a clip <=90s: bar advances, phase label and message change, quips list appears, video plays.
-2. Quip at t~0 plays; commentary never overlaps; video volume drops while speaking and returns after.
-3. Pause video mid-quip: audio pauses; play: resumes. Seek back: quips replay; seek forward: stale ones skipped.
-4. Click a quip: video seeks and that quip plays.
-5. Upload a >90s file and a non-video: toast with backend detail, alert box shown.
-6. Kill backend mid-job: up to 5 reconnects, then "Lost connection" toast. Upload a second clip while the first runs (input is disabled; try after finish) and check no stale updates.
-7. Reload/unmount leaves no console errors; object URL revoked.
-8. Job that completes with a quip whose audio_url is null shows text only.
+## 4. Not verified, needs manual testing
+1. Add the prompt file, start llama-server (command in CONVENTIONS.md), upload a clip <=60s: check log lines per window, crop box, total time.
+2. Whether the Qwen reply really follows {"seen","quips":[{"t","text"}]} with absolute t values.
+3. Crop quality on real wide stage footage (view frames; box thresholds are from the spike).
+4. UI shows "Analyzing part i of n" and the job-level error path.
 
 ## 5. Open issues and risks
-- VideoPlayer.jsx: clip durations unknown, so a long clip can delay later quips (dropped if >4s stale).
-- Backend audio_url uses PUBLIC_BASE_URL; must match the API host (config.py).
-- Progress is poll-less WS only; a missed "completed" message after reconnect depends on the server re-sending the snapshot.
+- llm.py `_read_prompt_file` is cached per process: restart after editing the prompt.
+- 60s clip = 6 sequential calls; at ~90 tok/s prefill expect several minutes. Tune FRAME_WIDTH/FRAMES_PER_WINDOW if too slow.
+- commentary.py: TTS durations still unknown to the server (see Session 4 risk).
 
 ## 6. Suggested next session
-End-to-end on 3 real clips, tune prompt/frame interval, record demo GIF, then docs (README, STATE, TASKS).
+Run end to end on 3 real clips, tune prompt/width/frames, then demo GIF and docs (README, TASKS).

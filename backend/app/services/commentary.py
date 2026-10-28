@@ -1,7 +1,9 @@
 import asyncio
 import logging
+import time
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
+from app.config import settings
 from app.schemas.events import CommentaryQuip, CommentaryResponse
 from app.services import llm as llm_service
 from app.services import tts as tts_service
@@ -10,16 +12,32 @@ from app.services import video_processor as video_processor_service
 logger = logging.getLogger("lionhype.commentary")
 
 
-def _normalize_quip(quip: Dict[str, Any]) -> Dict[str, Any]:
-    timestamp = quip.get("timestamp")
-    if timestamp is None and "timestamp_ms" in quip:
-        timestamp = float(quip["timestamp_ms"]) / 1000.0
-    if timestamp is None:
-        timestamp = 0.0
-    return {
-        "timestamp": float(timestamp),
-        "text": quip.get("text") or quip.get("commentary") or "",
-    }
+LAST_QUIP_MAX_WORDS = 14
+MIN_QUIP_WORDS = 3
+
+
+def finalize_timeline(quips: List[Dict[str, Any]], duration: float) -> List[Dict[str, Any]]:
+    """Sort, clamp to the video, enforce the minimum gap, and cut each quip to fit the time before the next."""
+    clamped = [
+        {"timestamp": min(max(q["timestamp"], 0.0), duration), "text": q["text"]}
+        for q in sorted(quips, key=lambda q: q["timestamp"])
+    ]
+    kept: List[Dict[str, Any]] = []
+    for quip in clamped:
+        if kept and quip["timestamp"] - kept[-1]["timestamp"] < settings.MIN_QUIP_GAP_SEC:
+            continue
+        kept.append(quip)
+    result = []
+    for i, quip in enumerate(kept):
+        if i + 1 < len(kept):
+            gap = kept[i + 1]["timestamp"] - quip["timestamp"]
+            max_words = max(MIN_QUIP_WORDS, int(gap * settings.QUIP_WORDS_PER_SECOND))
+        else:
+            max_words = LAST_QUIP_MAX_WORDS
+        text = " ".join(quip["text"].split()[:max_words])
+        if text:
+            result.append({"timestamp": quip["timestamp"], "text": text})
+    return result
 
 
 async def process_video_commentary(
@@ -28,6 +46,7 @@ async def process_video_commentary(
     progress_cb: Optional[Callable[[str, int, Optional[str]], Awaitable[None]]] = None
 ) -> CommentaryResponse:
     video_id = job_id or "default"
+    started = time.monotonic()
     logger.info("Starting commentary generation for video_id: %s", video_id)
 
     async def _report(status: str, progress: int, message: Optional[str] = None) -> None:
@@ -39,22 +58,35 @@ async def process_video_commentary(
             logger.warning("Progress callback failed: %s", e)
 
     await _report("extracting", 10)
-    frames = await asyncio.to_thread(video_processor_service.extract_frames, video_path)
-    
-    if not frames:
+    duration = await asyncio.to_thread(video_processor_service.get_video_duration, video_path)
+    box = await asyncio.to_thread(video_processor_service.compute_crop_box, video_path, duration)
+    windows = video_processor_service.plan_windows(duration, settings.WINDOW_SECONDS)
+    if not windows:
         raise ValueError("No frames could be extracted from video")
-        
-    logger.info("Frame extraction completed. Extracted %d frames.", len(frames))
-    
-    await _report("analyzing", 40)
-    event_timeline = await llm_service.generate_event_timeline(frames)
-    logger.info("LLM event timeline generated successfully.")
 
-    if not event_timeline:
-        return CommentaryResponse(quips=[])
+    raw_quips: List[Dict[str, Any]] = []
+    previous: List[str] = []
+    total_windows = len(windows)
+    for i, (start, end) in enumerate(windows):
+        await _report("analyzing", 20 + int(45 * i / total_windows), f"Analyzing part {i + 1} of {total_windows}")
+        frames = await asyncio.to_thread(
+            video_processor_service.sample_window_frames,
+            video_path, start, end, settings.FRAMES_PER_WINDOW, settings.FRAME_WIDTH, box,
+        )
+        if not frames:
+            raise ValueError(f"No frames could be extracted for window {i + 1} of {total_windows}")
+        window_quips = await llm_service.analyze_window(
+            frames, start, end, previous, label=f"window {i + 1}/{total_windows}"
+        )
+        raw_quips.extend(window_quips)
+        if window_quips:
+            previous = [q["text"] for q in window_quips[-2:]]
 
-    normalized_quips = [_normalize_quip(quip) for quip in event_timeline]
-    
+    normalized_quips = finalize_timeline(raw_quips, duration)
+    if not normalized_quips:
+        raise ValueError("The model produced no usable commentary")
+    logger.info("Timeline: %d quips from %d windows", len(normalized_quips), total_windows)
+
     await _report("synthesizing", 70)
     semaphore = asyncio.Semaphore(4)
     
@@ -91,4 +123,5 @@ async def process_video_commentary(
     if all_failed:
         logger.error("All TTS clips failed for video_id: %s", video_id)
 
+    logger.info("Pipeline for %s finished in %.1fs", video_id, time.monotonic() - started)
     return CommentaryResponse(quips=quips)

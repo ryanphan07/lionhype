@@ -32,13 +32,13 @@ def client(upload_dir):
 
 @pytest.fixture
 def fake_ai(monkeypatch):
-    async def fake_llm(frames):
-        return [{"timestamp": 0.0, "text": "first"}, {"timestamp": 1.0, "text": "second"}]
+    async def fake_llm(frames, start, end, previous=None, label=""):
+        return [{"timestamp": 0.0, "text": "first"}, {"timestamp": 3.0, "text": "second"}]
 
     async def fake_tts(quip, video_id=None):
         return {"timestamp": quip["timestamp"], "text": quip["text"], "audio_url": f"http://test/{video_id}/{quip['timestamp']}.mp3"}
 
-    monkeypatch.setattr(llm_module, "generate_event_timeline", fake_llm)
+    monkeypatch.setattr(llm_module, "analyze_window", fake_llm)
     monkeypatch.setattr(tts_module, "generate_audio_clip", fake_tts)
 
 
@@ -93,10 +93,10 @@ def test_upload_rejects_corrupt_video_and_removes_file(client, upload_dir):
 
 
 def test_pipeline_failure_marks_error_and_cleans_up(client, upload_dir, video_bytes, monkeypatch):
-    async def boom(frames):
+    async def boom(*args, **kwargs):
         raise RuntimeError("secret internal detail")
 
-    monkeypatch.setattr(llm_module, "generate_event_timeline", boom)
+    monkeypatch.setattr(llm_module, "analyze_window", boom)
     job_id = upload(client, video_bytes).json()["job_id"]
 
     job = client.get(f"/api/jobs/{job_id}").json()

@@ -13,9 +13,16 @@ class Settings(BaseSettings):
     LLM_BASE_URL: str = "http://127.0.0.1:8080/v1"
     LLM_API_KEY: str = "local-key"
     LLM_MODEL: str = "qwen-coder"
-    LLM_ENABLED: bool = True
-    LLM_TIMEOUT: float = 30.0
-    LLM_MAX_RETRIES: int = 2
+    LLM_TIMEOUT: float = 300.0  # seconds per call; a slow local model needs minutes per window
+    LLM_ENABLE_THINKING: bool = False
+    LLM_MAX_TOKENS: int = 500
+
+    WINDOW_SECONDS: float = 10.0
+    FRAMES_PER_WINDOW: int = 6
+    FRAME_WIDTH: int = 896
+    MAX_QUIPS_PER_WINDOW: int = 4
+    MIN_QUIP_GAP_SEC: float = 2.5
+    QUIP_WORDS_PER_SECOND: float = 2.5
 
     TTS_PROVIDER: str = "edge_tts"
     TTS_VOICE: str = "en-US-AnaNeural"
@@ -27,7 +34,7 @@ class Settings(BaseSettings):
 
     JOB_TTL_SECONDS: int = 3600
     CLEANUP_INTERVAL_SECONDS: int = 600
-    MAX_VIDEO_SECONDS: float = 90.0
+    MAX_VIDEO_SECONDS: float = 60.0
     CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:3000"]
     PUBLIC_BASE_URL: str = "http://localhost:8000"
     UPLOAD_DIR: str = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "uploads"))

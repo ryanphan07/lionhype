@@ -32,7 +32,7 @@ These helpers are actively integrated into the upload pipeline in `backend/app/m
 Features in place:
 - `process_video_commentary(video_path, job_id, progress_cb)` as the core async orchestrator; `job_id` is the `video_id` for the audio folder
 - CPU-bound frame extraction offloaded via `asyncio.to_thread`
-- LLM event timeline generation via `generate_event_timeline(frames)`
+- Vision LLM: motion crop (once per video), windows of frames sent as image_url parts, one call per window via `analyze_window`, merged and budgeted in `commentary.finalize_timeline` (untested against a live model)
 - Concurrent TTS generation via `asyncio.gather`
 - Mapping audio URLs back to corresponding quip objects
 - Structured `CommentaryResponse` return values

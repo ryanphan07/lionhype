@@ -1,10 +1,12 @@
-import asyncio
 import json
 import logging
-from typing import Any, Dict, List
+import re
+import time
+from functools import lru_cache
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from app.config import settings
-from app.schemas.events import CommentaryResponse, EventTimeline
 
 logger = logging.getLogger("lionhype.llm")
 
@@ -19,106 +21,133 @@ llm_client = AsyncOpenAI(
     timeout=settings.LLM_TIMEOUT,
 ) if AsyncOpenAI is not None else None
 
-SYSTEM_PROMPT = """You are an energetic, hilarious, over-the-top lion dance sports commentator. 
-Analyze the provided performance timeline of events and output high-energy commentary quips with timestamps.
-Return ONLY valid JSON with keys: performance_id, commentary (list of objects with timestamp_ms, text, sound_effect)."""
+PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "commentary_system.txt"
+JSON_NUDGE = "Your previous reply was not valid JSON. Return only the JSON object, no prose and no code fences."
 
 
-def _normalize_timeline_items(items):
-    normalized = []
-    for item in items:
+class LLMOutputError(Exception):
+    """The model replied, but not with usable JSON."""
+
+
+@lru_cache(maxsize=1)
+def _read_prompt_file() -> str:
+    return PROMPT_PATH.read_text(encoding="utf-8")
+
+
+def load_system_prompt() -> str:
+    """The prompt file with the literal MAX_QUIPS replaced by MAX_QUIPS_PER_WINDOW."""
+    return re.sub(r"MAX_QUIPS(?!_)", str(settings.MAX_QUIPS_PER_WINDOW), _read_prompt_file())
+
+
+def strip_think(text: str) -> str:
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    return re.sub(r"^.*?</think>", "", text, flags=re.DOTALL).strip()  # opening tag was in the template
+
+
+def parse_model_json(text: str) -> Dict[str, Any]:
+    """Pull the first JSON object out of the reply, tolerating code fences and stray prose."""
+    text = strip_think(text or "")
+    decoder = json.JSONDecoder()
+    for match in re.finditer(r"\{", text):
+        try:
+            obj, _ = decoder.raw_decode(text[match.start():])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict):
+            return obj
+    raise LLMOutputError("No JSON object found in model reply")
+
+
+def clean_quips(parsed: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Return [{"timestamp", "text"}] sorted by time, dropping malformed or empty entries."""
+    raw = parsed.get("quips")
+    if not isinstance(raw, list):
+        raise LLMOutputError("Model JSON has no 'quips' list")
+    quips = []
+    for item in raw:
         if not isinstance(item, dict):
             continue
-        timestamp = item.get("timestamp")
-        if timestamp is None and "timestamp_ms" in item:
-            timestamp = float(item["timestamp_ms"]) / 1000.0
-        if timestamp is None:
-            timestamp = 0.0
-        normalized.append({
-            "timestamp": float(timestamp),
-            "text": item.get("text") or item.get("commentary") or "",
+        try:
+            t = float(item["t"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        text = " ".join(str(item.get("text") or "").split())
+        if text and t == t:  # t == t rejects NaN
+            quips.append({"timestamp": t, "text": text})
+    return sorted(quips, key=lambda q: q["timestamp"])
+
+
+def build_messages(
+    frames: List[Dict[str, Any]],
+    start: float,
+    end: float,
+    previous_quips: List[str],
+    nudge: bool = False,
+) -> List[Dict[str, Any]]:
+    """System prompt first, the images last, so the server can reuse its prefix cache."""
+    intro = f"These frames cover {start:.1f}s to {end:.1f}s of the video."
+    if previous_quips:
+        intro += " Your most recent previous quips (do not repeat them): " + json.dumps(previous_quips)
+    if nudge:
+        intro += " " + JSON_NUDGE
+    content: List[Dict[str, Any]] = [{"type": "text", "text": intro}]
+    for frame in frames:
+        content.append({"type": "text", "text": f"Frame at t={frame['timestamp']}s:"})
+        content.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:image/jpeg;base64,{frame['image_data']}"},
         })
-    return normalized
-
-
-async def _retry_llm_call(func, max_retries=settings.LLM_MAX_RETRIES, base_delay=1.0, timeout=settings.LLM_TIMEOUT):
-    last_exc = None
-    for attempt in range(max_retries + 1):
-        try:
-            return await asyncio.wait_for(func(), timeout=timeout)
-        except Exception as e:
-            last_exc = e
-            if attempt < max_retries:
-                logger.warning("LLM call failed on attempt %d/%d: %s", attempt + 1, max_retries + 1, str(e))
-                await asyncio.sleep(base_delay * (2 ** attempt))
-            else:
-                logger.error("LLM service is unreachable after %d attempts.", max_retries + 1)
-    raise last_exc
-
-
-async def generate_event_timeline(frames: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Convert sampled video frames into a simple list of commentary cues."""
-    if not frames:
-        return []
-
-    if settings.LLM_ENABLED and llm_client is not None:
-        async def _call_llm():
-            payload = {"frames": frames}
-            response = await llm_client.chat.completions.create(
-                model=settings.LLM_MODEL,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": json.dumps(payload)},
-                ],
-                temperature=0.7,
-                response_format={"type": "json_object"},
-            )
-            content = response.choices[0].message.content
-            if isinstance(content, str):
-                parsed = json.loads(content)
-                commentary_items = parsed.get("commentary") or parsed.get("quips") or []
-                if commentary_items:
-                    logger.debug("Successfully parsed %d raw items.", len(commentary_items))
-                    return _normalize_timeline_items(commentary_items)
-            return None
-
-        try:
-            result = await _retry_llm_call(_call_llm)
-            if result:
-                return result
-        except Exception:
-            pass
-
     return [
-        {
-            "timestamp": float(frame["timestamp"]),
-            "text": f"Frame at {float(frame['timestamp']):.2f}s captures the highlight reel energy.",
-        }
-        for frame in frames
+        {"role": "system", "content": load_system_prompt()},
+        {"role": "user", "content": content},
     ]
 
 
-async def generate_commentary(timeline: EventTimeline) -> CommentaryResponse:
-    user_content = f"Generate commentary for these events: {timeline.model_dump_json()}"
-    
-    if not settings.LLM_ENABLED or llm_client is None:
-        return CommentaryResponse(quips=[{"timestamp": 0.0, "text": "Commentary unavailable in offline mode."}])
+async def _call(messages: List[Dict[str, Any]], frame_count: int, label: str) -> str:
+    started = time.monotonic()
+    response = await llm_client.chat.completions.create(
+        model=settings.LLM_MODEL,
+        messages=messages,
+        temperature=0.8,
+        max_tokens=settings.LLM_MAX_TOKENS,
+        extra_body={"chat_template_kwargs": {"enable_thinking": settings.LLM_ENABLE_THINKING}},
+    )
+    usage = getattr(response, "usage", None)
+    logger.info(
+        "LLM %s: frames=%d prompt_tokens=%s completion_tokens=%s seconds=%.1f",
+        label,
+        frame_count,
+        getattr(usage, "prompt_tokens", "?"),
+        getattr(usage, "completion_tokens", "?"),
+        time.monotonic() - started,
+    )
+    return response.choices[0].message.content or ""
 
-    async def _call_llm():
-        response = await llm_client.chat.completions.create(
-            model=settings.LLM_MODEL,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_content},
-            ],
-            temperature=0.7,
-            response_format={"type": "json_object"},
-        )
-        raw_json = json.loads(response.choices[0].message.content)
-        normalized = _normalize_timeline_items(raw_json.get("commentary") or raw_json.get("quips") or [])
-        return CommentaryResponse(quips=normalized)
 
-    try:
-        return await _retry_llm_call(_call_llm)
-    except Exception:
-        return CommentaryResponse(quips=[{"timestamp": 0.0, "text": "Commentary unavailable in offline mode."}])
+async def analyze_window(
+    frames: List[Dict[str, Any]],
+    start: float,
+    end: float,
+    previous_quips: Optional[List[str]] = None,
+    label: str = "window",
+) -> List[Dict[str, Any]]:
+    """One LLM call for one window. Retries once with a JSON nudge if the reply is unusable.
+
+    Raises on transport errors/timeouts (no retry: a slow model would double the wait) and on a second bad reply.
+    """
+    if llm_client is None:
+        raise RuntimeError("openai package is not installed")
+    previous_quips = previous_quips or []
+    last_error: Optional[Exception] = None
+    for attempt in range(2):
+        messages = build_messages(frames, start, end, previous_quips, nudge=attempt > 0)
+        reply = await _call(messages, len(frames), label)
+        try:
+            parsed = parse_model_json(reply)
+            quips = clean_quips(parsed)
+            logger.debug("%s seen: %s", label, str(parsed.get("seen"))[:300])
+            return quips
+        except LLMOutputError as exc:
+            last_error = exc
+            logger.warning("%s: unusable reply on attempt %d (%s); reply head: %r", label, attempt + 1, exc, reply[:200])
+    raise LLMOutputError(f"{label}: model returned no usable JSON after retry") from last_error

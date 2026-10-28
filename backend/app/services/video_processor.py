@@ -1,50 +1,20 @@
 import base64
-import os
-from typing import Any, Dict, List
-
-import cv2
-
-
-def extract_frames(video_path: str, frame_interval_sec: float = 1.0) -> List[Dict[str, Any]]:
-    frames: List[Dict[str, Any]] = []
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        raise ValueError("Error opening video file")
-
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-    frame_count = 0
-    frame_interval = max(1, int(fps * frame_interval_sec))
-
-    try:
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-
-            if frame_count % frame_interval == 0:
-                resized_frame = cv2.resize(frame, (224, 224))
-                success, encoded = cv2.imencode(".jpg", resized_frame)
-                if success:
-                    b64_str = base64.b64encode(encoded.tobytes()).decode("utf-8")
-                    timestamp = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
-                    frames.append({
-                        "timestamp": round(timestamp, 2),
-                        "image_data": b64_str,
-                    })
-
-            frame_count += 1
-    finally:
-        cap.release()
-
-    return frames if frames else []
-
+import logging
+import math
 import os
 import re
-import cv2
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+import cv2
+import numpy as np
+
+logger = logging.getLogger("lionhype.video")
 
 ALLOWED_EXTENSIONS = {".mp4", ".mov", ".avi"}
 MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024  # 100 MB
+
+Box = Tuple[float, float, float, float]  # (x0, y0, x1, y1) as fractions of the frame
 
 
 def sanitize_filename(filename: str) -> str:
@@ -104,3 +74,139 @@ def is_video_corrupt(file_path: str) -> bool:
         return True
 
     return False
+
+
+def motion_box(cap, duration, probe=30, probe_w=320, thresh=30, min_hits=3, min_brightness=50) -> Optional[Box]:
+    """Return (x0, y0, x1, y1) as fractions of the frame covering where the bright, moving subjects are.
+
+    Motion is counted only where the scene is lit (dark audience areas full of tiny phone lights and
+    sensor noise are ignored), and speckle is removed with a morphological opening. Returns None when
+    there is too little motion or the box would cover more than 80% of the frame.
+    """
+    grays = []
+    for i in range(probe):
+        cap.set(cv2.CAP_PROP_POS_MSEC, duration * (i + 0.5) / probe * 1000)
+        ok, frame = cap.read()
+        if not ok:
+            continue
+        h, w = frame.shape[:2]
+        small = cv2.resize(frame, (probe_w, max(1, int(h * probe_w / w))), interpolation=cv2.INTER_AREA)
+        gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
+        grays.append(cv2.GaussianBlur(gray, (5, 5), 0).astype(np.float32))
+    if len(grays) < 4:
+        return None
+    stack = np.stack(grays)
+    background = np.median(stack, axis=0)
+    lit = stack.max(axis=0) > min_brightness
+    hits = ((np.abs(stack - background) > thresh) & lit).sum(axis=0)
+    mask = (hits >= min_hits).astype(np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+    if mask.sum() < 20:
+        return None
+    gh, gw = mask.shape
+
+    def span(profile, keep=0.2, smooth=7, gap=10):
+        """Largest high-energy run in a 1-D motion profile (ignores isolated flicker far from the action)."""
+        profile = np.convolve(profile.astype(np.float32), np.ones(smooth) / smooth, mode="same")
+        idx = np.nonzero(profile >= keep * profile.max())[0]
+        runs, start, prev = [], idx[0], idx[0]
+        for i in idx[1:]:
+            if i - prev > gap:
+                runs.append((start, prev))
+                start = i
+            prev = i
+        runs.append((start, prev))
+        best = max(runs, key=lambda r: profile[r[0]:r[1] + 1].sum())
+        return best[0], best[1] + 1
+
+    cx0, cx1 = span(mask.sum(axis=0))
+    cy0, cy1 = span(mask.sum(axis=1))
+    x0, x1, y0, y1 = cx0 / gw, cx1 / gw, cy0 / gh, cy1 / gh
+    # pad around the box, enforce a minimum size, clamp to the frame
+    bw, bh = x1 - x0, y1 - y0
+    x0, x1 = x0 - 0.12 * bw - 0.02, x1 + 0.12 * bw + 0.02
+    y0, y1 = y0 - 0.12 * bh - 0.02, y1 + 0.12 * bh + 0.02
+    if x1 - x0 < 0.35:
+        mid = (x0 + x1) / 2
+        x0, x1 = mid - 0.175, mid + 0.175
+    if y1 - y0 < 0.25:
+        mid = (y0 + y1) / 2
+        y0, y1 = mid - 0.125, mid + 0.125
+    x0, y0, x1, y1 = max(0.0, x0), max(0.0, y0), min(1.0, x1), min(1.0, y1)
+    if (x1 - x0) * (y1 - y0) > 0.8:  # motion everywhere: cropping would not help
+        return None
+    return float(x0), float(y0), float(x1), float(y1)
+
+
+def compute_crop_box(video_path: str, duration: float) -> Optional[Box]:
+    """Compute the crop box once per video. None means use the full frame."""
+    cap = cv2.VideoCapture(video_path)
+    try:
+        if not cap.isOpened():
+            raise ValueError("Error opening video file")
+        box = motion_box(cap, duration)
+    finally:
+        cap.release()
+    if box:
+        logger.info("Crop box (x0,y0,x1,y1 fractions): %s", tuple(round(v, 3) for v in box))
+    else:
+        logger.info("Crop box: none, using the full frame")
+    return box
+
+
+def plan_windows(duration: float, window_sec: float, min_tail_sec: float = 2.0) -> List[Tuple[float, float]]:
+    """Split [0, duration] into windows of window_sec; a tail shorter than min_tail_sec joins the previous window."""
+    if duration <= 0 or window_sec <= 0:
+        return []
+    windows = []
+    start = 0.0
+    while start < duration:
+        windows.append((start, min(start + window_sec, duration)))
+        start += window_sec
+    if len(windows) > 1 and windows[-1][1] - windows[-1][0] < min_tail_sec:
+        tail = windows.pop()
+        windows[-1] = (windows[-1][0], tail[1])
+    return windows
+
+
+def frame_count_for_window(start: float, end: float, max_frames: int) -> int:
+    """Up to max_frames, but never more than about one per second of window."""
+    return max(1, min(max_frames, math.ceil(end - start)))
+
+
+def sample_window_frames(
+    video_path: str,
+    start: float,
+    end: float,
+    max_frames: int,
+    width: int,
+    box: Optional[Box] = None,
+) -> List[Dict[str, Any]]:
+    """Return evenly spaced frames from [start, end) as [{"timestamp", "image_data"}] (base64 JPEG).
+
+    The same crop box is applied to every frame, then each frame is resized to `width` keeping its aspect ratio.
+    """
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise ValueError("Error opening video file")
+    n = frame_count_for_window(start, end, max_frames)
+    frames: List[Dict[str, Any]] = []
+    try:
+        for i in range(n):
+            t = start + (end - start) * (i + 0.5) / n
+            cap.set(cv2.CAP_PROP_POS_MSEC, t * 1000)
+            ok, frame = cap.read()
+            if not ok or frame is None:
+                continue
+            if box:
+                h, w = frame.shape[:2]
+                x0, y0, x1, y1 = box
+                frame = frame[int(y0 * h):int(y1 * h), int(x0 * w):int(x1 * w)]
+            fh, fw = frame.shape[:2]
+            frame = cv2.resize(frame, (width, max(1, int(fh * width / fw))), interpolation=cv2.INTER_AREA)
+            ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            if ok:
+                frames.append({"timestamp": round(t, 2), "image_data": base64.b64encode(buf).decode()})
+    finally:
+        cap.release()
+    return frames
