@@ -1,131 +1,54 @@
-This file tracks the current architectural reality and completed features of the LionHype project.
+# LionHype: current state (2026-10-28)
 
-## What is already implemented
+What exists today. Verified means checked by a test or by a run; untested means written but never exercised. Source of truth for gaps: `docs/AUDIT.md`; for next work: `docs/TASKS.md`.
 
-### Backend
+## Flow
 
-#### Frame extraction
-The core extraction logic is implemented in `backend/app/services/video_processor.py`.
+```
+upload -> validate + save -> job created -> background pipeline:
+  extracting   duration, motion crop box (once per video)
+  analyzing    per 10 s window: sample frames -> vision LLM -> quips (sequential)
+  synthesizing finalize timeline -> edge-tts per quip (bounded concurrency) -> measure durations -> schedule
+  completed    GET /api/jobs/{id} returns quips + audio_available
+```
+The browser keeps the file as a blob URL for playback; the server never serves videos.
 
-Features in place:
-- OpenCV video capture via `cv2.VideoCapture`
-- Failure handling when a file cannot be opened
-- FPS-based sampling via `frame_interval_sec`
-- Frame resizing to a smaller output size (224x224) for efficient downstream payload size
-- JPEG encoding and base64 conversion for each selected frame
-- Timestamp generation in seconds with rounding
-- Resource cleanup via `finally` and `cap.release()`
+## Backend (`backend/app/`)
 
-This is the critical “raw media to model-ready payload” component.
+| File | What it does | Status |
+|---|---|---|
+| `main.py` | FastAPI app, CORS, `POST /api/upload`, `GET /api/jobs/{id}`, `WS /ws/analyze/{job_id}`, audio-only static mount, generic 500 handler, periodic job cleanup | Route tests (LLM/TTS faked); upload and ws exercised by hand in earlier sessions |
+| `config.py` | Single `settings` object, `.env` resolved relative to the file. Full list in `backend/.env.example` | Verified |
+| `services/jobs.py` | In-memory `JobStore`: status/progress monotonic, terminal states sticky, subscriber queues, TTL purge | Verified (12 tests) |
+| `services/pipeline.py` | Background runner; failure marks job `error` with a generic message and deletes the job's files | Verified |
+| `services/video_processor.py` | Filename sanitizing, extension/size checks, corruption check, duration, `motion_box` / `compute_crop_box`, `plan_windows`, `sample_window_frames` (same crop for all frames, aspect-preserving resize to `FRAME_WIDTH`) | Verified on synthetic video; crop validated on real footage via the spike |
+| `services/llm.py` | `analyze_window`: system prompt + `image_url` parts, `<think>` and fence stripping, first-JSON-object parse (`raw_decode`), one retry with a JSON nudge, token/time logging. No canned fallback: failures raise | Verified live (one window, Qwen3.5-9B, 44.7 s for 6 frames / 3248 prompt tokens) |
+| `services/commentary.py` | Window loop, `finalize_timeline` (sort, clamp, `MIN_QUIP_GAP_SEC`, word budget, last 14), TTS fan-out, `schedule_quips`, `audio_available` | Verified live; known defects F1-F3 in the audit |
+| `services/tts.py` | edge-tts with `TTS_VOICE`/`TTS_RATE`, per-clip `TTS_TIMEOUT_SECONDS`; any failure deletes partial files and returns None; durations via mutagen (unreadable duration counts as failure) | Verified live with edge-tts 7.3.1 |
+| `schemas/events.py` | `CommentaryQuip{timestamp,text,audio_url,duration_sec}`, `CommentaryResponse{quips,video_url,audio_available}` | Verified |
+| `prompts/commentary_system.txt` | Owner-written announcer prompt; `MAX_QUIPS` replaced at load; cached per process (restart after editing) | Works with the 9B model; quality on real motion not judged |
 
-#### Validation & Security helpers
-`backend/app/services/video_processor.py` includes utility functions for input validation and integrity checks:
-- `sanitize_filename()` to prevent path traversal attacks
-- `validate_upload_metadata()` to enforce allowed file extensions and size limits
-- `is_video_corrupt()` to verify video container integrity using OpenCV
+### Behavior worth knowing
+- Limits: extensions `.mp4 .mov .avi`, 100 MB, `MAX_VIDEO_SECONDS` (60). Rejections are HTTP 400 `{"detail": ...}` and delete the file.
+- A window that fails (transport error, unusable JSON after one retry) fails the whole job. A job with zero usable quips fails.
+- TTS failures never fail the job: the quip is kept with `audio_url: null, duration_sec: null`; if no clip has audio the job message is "Commentary ready (audio unavailable)".
+- `schedule_quips`: audio quips are processed in time order and may not start before the previous audio ends + 0.3 s; shift up to `MAX_SHIFT_SEC` (2.0) else drop; no-audio quips never block. Every shift/drop is logged.
+- Cleanup: failure deletes video, frames and audio for the job; a loop purges expired jobs (TTL 1 h) and their files. Files orphaned by a server restart are not swept (F4).
+- Removed earlier: `/api/commentary/*`, presigned/boto3 endpoint, `backend/main.py`, `mcp_server.py`, canned LLM output, fake audio, 224x224 JSON-text frames.
 
-These helpers are actively integrated into the upload pipeline in `backend/app/main.py` to enforce file constraints and sanitize inputs upon user upload.
+## Frontend (`frontend/src/`)
+- `App.jsx`: upload via axios, then `WS /ws/analyze/{job_id}` with capped exponential reconnect (5 tries), switches on `msg.status` only, on `completed` fetches `GET /api/jobs/{id}`, shows toast + inline error, `VITE_API_BASE` (default http://localhost:8000).
+- `components/VideoPlayer.jsx`: blob-URL video, quip queue driven by `timeupdate`, one clip at a time, video ducked to 0.3 while a clip plays, stale lines (older than 4 s) skipped, seek resets, pause/resume handled, autoplay-block notice, "audio unavailable" notice, clickable commentary list that seeks.
+- Lint and build pass. No frontend tests. Browser behavior (progress, sync, seek) has not been re-verified since session 6.
 
-#### Commentary orchestration
-`backend/app/services/commentary.py` implements the async commentary pipeline.
+## Tests: 92 passing (`pytest backend/tests -q`)
+- `test_jobs.py` JobStore. `test_api.py` upload, job GET, WebSocket, cleanup, videos not served, validators. `test_main.py` orchestration with LLM/TTS faked (file name is historical). `test_vision.py` crop, windows, frame sampling on real tiny videos, prompt/message building, parser, finalize, window failure. `test_audio.py` TTS success/failure/timeout/no leftover files, mutagen on a hand-built mp3, `schedule_quips`, `audio_available`, parser edge cases.
+- Not covered: real LLM or real edge-tts in CI (both need external services), real `motion_box` on moving-subject video, frontend.
 
-Features in place:
-- `process_video_commentary(video_path, job_id, progress_cb)` as the core async orchestrator; `job_id` is the `video_id` for the audio folder
-- CPU-bound frame extraction offloaded via `asyncio.to_thread`
-- Vision LLM: motion crop (once per video), windows of frames sent as image_url parts, one call per window via `analyze_window`, merged and budgeted in `commentary.finalize_timeline` (untested against a live model)
-- Concurrent TTS generation via `asyncio.gather`
-- Mapping audio URLs back to corresponding quip objects
-- Structured `CommentaryResponse` return values
-- Detailed step-by-step lifecycle logging for frame extraction, LLM timeline generation, and TTS synthesis
+## Environment
+- Windows native, no Docker (Docker files are stale and untested).
+- llama-server at 127.0.0.1:8080 with `--mmproj`. In use now: Qwen3.5-9B Q4_K_M; CLAUDE.md names Qwen3.6-35B-A3B. Decide which one is the demo model.
+- edge-tts must be >= 7.3.1 (7.2.8 gets 403).
 
-This is the main “content pipeline” that turns extracted visual frames into final commentary items with audio.
-
-#### LLM integration
-`backend/app/services/llm.py` contains the LLM-facing logic.
-
-Features in place:
-- Local/offline-friendly fallback when no LLM client is configured
-- Timeline normalization for both `timestamp` and `timestamp_ms` formats
-- A generated event timeline based on input frames when external services are unavailable
-- A system prompt designed for energetic lion-dance-style commentary
-- Observability logging for retry wrappers and fallback parsing
-
-The code is intentionally resilient in CI and offline environments.
-
-#### TTS synthesis
-`backend/app/services/tts.py` adds audio clip generation.
-
-Features in place:
-- Per-quip edge-tts synthesis (`TTS_VOICE`, `TTS_RATE`, per-clip `TTS_TIMEOUT_SECONDS`, concurrency `TTS_CONCURRENCY`), untested against live edge-tts
-- Any failure (exception, timeout, empty/tiny file, unreadable duration) logs a warning, deletes partial files and returns None, so `audio_url` is null. No fake audio is ever written.
-- mp3 duration measured with mutagen and stored as `duration_sec`
-- `commentary.schedule_quips`: audio quips never start before the previous audio ends + 0.3s; shifted up to `MAX_SHIFT_SEC`, else dropped; no-audio quips are kept and never block
-- Result carries `audio_available`; with no audio the job message is "Commentary ready (audio unavailable)" and the UI shows a notice
-
-#### FastAPI app, job API and websocket flow
-`backend/app/main.py` (routes), `backend/app/services/jobs.py` (in-memory `JobStore`) and `backend/app/services/pipeline.py` (background runner). Unverified against real footage and the real LLM/TTS; covered by route tests with the LLM and TTS mocked.
-
-- `POST /api/upload`: validates (filename, extension, size) before writing, saves to `<UPLOAD_DIR>/videos/<job_id>_<safe_name>`, checks the container, creates the job and runs the pipeline via `BackgroundTasks`. Returns `{job_id, filename}`. No frame extraction at upload time.
-- `GET /api/jobs/{job_id}`: `{job_id, status, progress, message, result}`; 404 `{"detail": "Job not found"}`.
-- `WS /ws/analyze/{job_id}`: server-to-client only. Sends the current snapshot, then live updates, and closes 1000 after `completed`/`error`. Unknown job: error message and close 4404. Detects client disconnect while idle and always unsubscribes.
-- Pipeline runner: `process_video_commentary(video_path, job_id=..., progress_cb=...)` drives `extracting`, `analyzing`, `synthesizing`; then `job_store.complete`. On any exception it logs, marks the job `error` with a generic message, and deletes the job's video, frames dir and audio dir. A failing progress callback never aborts the pipeline.
-- Only `<UPLOAD_DIR>/audio` is served statically (`/uploads/audio/...`); videos are never served.
-- Unhandled exceptions return a generic 500 `{"detail": "Internal server error"}` and are logged.
-- Removed: `/api/commentary/generate`, `/api/commentary/mock`, `job_tracker`, `backend/mcp_server.py`, `generate_video_commentary`.
-
-#### Schemas
-`backend/app/schemas/events.py` defines the data models used by the app:
-- `EventTimeline`
-- `CommentaryQuip`
-- `CommentaryResponse`
-
-It includes the `audio_url` field needed to attach generated audio to each commentary quip.
-
-#### Deployment & Configuration
-Docker is untested and not part of the MVP; the app runs natively. Configuration uses a `.env` pattern to manage external AI provider credentials and settings, with built-in retry logic for resilient service communication.
-
-### Frontend
-
-The frontend lives in `frontend/src`.
-
-#### App-level flow
-`frontend/src/App.jsx` does the following:
-- Accepts video upload input and posts it to the backend
-- Opens a WebSocket to `/ws/analyze` (not yet updated to the job API: still needs `job_id` and the new upload response)
-- Tracks backend processing messages across canonical phases (`uploading`, `extracting`, `analyzing`, `synthesizing`, `completed`, `error`)
-- Updates UI status/progress indicators and pipeline stage labels
-- Stores final commentary quips when processing completes
-- Displays explicit error messaging via `react-toastify` if analysis fails
-- Implements auto-reconnect logic for WebSocket drops
-
-#### Video player UI
-`frontend/src/components/VideoPlayer.jsx` handles the playback experience.
-
-Features in place:
-- Displays the uploaded video
-- Watches the current playback time against quip timestamps
-- Triggers audio playback as each commentary point is reached
-- Renders the final quip list once processing is complete
-- Includes audio controls for the synthesized clips
-
-### Testing
-92 backend tests, all passing. LLM and edge-tts are faked; `tests/test_audio.py` covers TTS paths, mutagen duration on a hand-built mp3, scheduling, audio_available and the JSON parser.
-- `tests/test_jobs.py`: JobStore behavior
-- `tests/test_main.py`: frame extraction, commentary orchestration, progress callback, TTS failure handling
-- `tests/test_api.py`: upload, GET job, WebSocket (replay, 4404, live progress, idle disconnect), pipeline failure cleanup, videos not served
-
-## Current maturity assessment
-
-This repo is best categorized as:
-- a local-first prototype,
-- capable of demonstrating the requested flow,
-- useful for iteration and experimentation,
-- not yet a hardened shipped product.
-
-The main architecture and flow are in place. The remaining work is mostly about robustness, real-world validation, operational polish, and deployment readiness.
-
-## Safety and cleanup (session 3B)
-- Only `<UPLOAD_DIR>/audio` is served (`/uploads/audio`). Uploads over `MAX_VIDEO_SECONDS` (default 90) or unreadable are rejected with 400 and their file is deleted.
-- Unhandled errors return `{"detail": "Internal server error"}` and are logged; logging is configured in `app/main.py`.
-- Any failure after the first disk write deletes the job's files. A lifespan task purges expired jobs and their files every `CLEANUP_INTERVAL_SECONDS` (600).
-- `llm.py` and `tts.py` use the shared `settings`. `backend/.env.example` lists all settings.
+## Maturity
+Local-first prototype that runs end to end with no fake output. Not hardened: single in-memory job store, no auth, no queue, unpinned dependencies, one unofficial TTS endpoint. Honest and demoable once the timing defects (audit F1-F3) are fixed and the README/GIF exist.

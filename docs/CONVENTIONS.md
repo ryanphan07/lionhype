@@ -3,11 +3,12 @@
 ## Project context
 LionHype is a local-first app that turns lion dance videos into humorous, time-synced AI commentary with TTS audio. FastAPI backend (OpenCV frames, OpenAI-compatible multimodal LLM, edge-tts) + React/Vite frontend with WebSocket progress.
 
-Goal: a credible, honest, demoable MVP for a resume (upload a clip of 90s or less, see progress, get commentary with non-overlapping audio, run locally in a few commands). Do not add features beyond `docs/AUDIT.md` and `TASKS.md` without asking.
+Goal: a credible, honest, demoable MVP for a resume (upload a clip of 90s or less; the code currently enforces `MAX_VIDEO_SECONDS` = 60, owner to decide, see TASKS, see progress, get commentary with non-overlapping audio, run locally in a few commands). Do not add features beyond `docs/AUDIT.md` and `TASKS.md` without asking.
 
 ## Environment
 - Windows + PowerShell. Native run; Docker is untested and not part of the MVP.
 - LLM: llama-server (OpenAI-compatible) at `http://127.0.0.1:8080/v1`, multimodal via `--mmproj`. Configure via `backend/.env` (see `backend/.env.example` for LLM_*, WINDOW_SECONDS, FRAMES_PER_WINDOW, FRAME_WIDTH, MAX_QUIPS_PER_WINDOW, MAX_VIDEO_SECONDS).
+- Model in use on 2026-10-28: Qwen3.5-9B Q4_K_M (CLAUDE.md names Qwen3.6-35B-A3B). Measured: about 45 s per 10 s window.
 - Start it with: `llama-server -m <gguf> --mmproj <mmproj-F16.gguf> -c 32768 -np 1 -ngl 99 --port 8080 --jinja`
 - The system prompt lives in `backend/app/prompts/commentary_system.txt` (owner-written; `MAX_QUIPS` is replaced by MAX_QUIPS_PER_WINDOW at load). The LLM step never falls back to canned text: a failed window ends the job in `error`.
 - TTS: edge-tts (needs internet). Failures yield no audio (`audio_url` null), never placeholder files. Settings: TTS_VOICE, TTS_RATE, TTS_TIMEOUT_SECONDS, MAX_SHIFT_SEC.
@@ -15,7 +16,7 @@ Goal: a credible, honest, demoable MVP for a resume (upload a clip of 90s or les
 
 ## Commands
 (If any of these is wrong, fix this section.)
-Run from the repo root in PowerShell unless noted. Tests (92) verified 2026-10-28; lint, build and `uvicorn` last verified 2026-10-27.
+Run from the repo root in PowerShell unless noted. Tests (92) verified 2026-10-28; lint and build verified 2026-10-28, `uvicorn` last verified 2026-10-27. edge-tts must be >= 7.3.1 (re-run `pip install -r requirements.txt` after pulling).
 - Backend setup (once): `cd backend; python -m venv venv; venv\Scripts\Activate.ps1; pip install -r requirements.txt` .
 - Backend tests: `pytest backend/tests -q` (works from the repo root or from `backend/`).
 - Backend run: `cd backend; uvicorn app.main:app --port 8000`. `backend/.env` is resolved relative to `config.py`, so the working directory does not matter for `.env`. `CORS_ORIGINS` (JSON list) is configurable there.
@@ -63,6 +64,10 @@ idle -> uploading -> extracting -> analyzing -> synthesizing -> completed
 ## Testing
 - Tests assert behavior. Mock only external boundaries (LLM client, TTS, OpenCV I/O), not the logic under test.
 - Run backend tests and frontend lint/build before every commit. One logical change per commit.
+
+## Timing
+- Spoken-line scheduling is server-side (`commentary.schedule_quips`). Measured TTS speed: about 1.8 words per second including padding (8 words = 4.5 s). Keep `MIN_QUIP_GAP_SEC`, the prompt's spacing rule and `QUIP_WORDS_PER_SECOND` consistent with that.
+- Quip timestamps in results should be rounded to 2 decimals (not yet true after a shift: TASKS session 7).
 
 ## Library / API Pins
 - **react-toastify**: use string literals for position, e.g. `toast.error(msg, { position: "top-right" })`. Do NOT use `toast.POSITION.TOP_RIGHT` (deprecated).
