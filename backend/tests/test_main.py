@@ -9,7 +9,7 @@ from app.services import commentary as commentary_module
 from app.services import llm as llm_module
 from app.services import tts as tts_module
 from app.services import video_processor
-from backend.main import app
+from app.main import app
 
 client = TestClient(app)
 
@@ -89,9 +89,9 @@ def test_ws_analyze_returns_final_payload(monkeypatch):
     async def fake_process_video_commentary(_):
         return CommentaryResponse(quips=[CommentaryQuip(timestamp=1.25, text="quips", audio_url="http://example.com/clip.mp3")])
 
-    monkeypatch.setattr("backend.main.process_video_commentary", fake_process_video_commentary)
+    monkeypatch.setattr("app.main.process_video_commentary", fake_process_video_commentary)
 
-    with client.websocket_connect("/ws/analyze") as websocket:
+    with client.websocket_connect("/ws/analyze?job_id=test-job") as websocket:
         websocket.send_json({"video_path": "fake.mp4"})
         first = websocket.receive_json()
         second = websocket.receive_json()

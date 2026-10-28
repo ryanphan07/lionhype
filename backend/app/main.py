@@ -4,18 +4,24 @@ import shutil
 import uuid
 
 from fastapi import FastAPI, File, UploadFile, WebSocket, WebSocketDisconnect, HTTPException, Request, BackgroundTasks
-from pydantic import BaseModel
-import boto3
-from botocore.exceptions import NoCredentialsError
 from app.services.video_processor import validate_upload_metadata, sanitize_filename, is_video_corrupt
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.config import settings
 from app.schemas.events import CommentaryResponse
 from app.services.commentary import process_video_commentary, generate_video_commentary
 from app.services.video_processor import process_video
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 UPLOAD_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "uploads"))
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
@@ -74,29 +80,6 @@ async def upload_video(file: UploadFile = File(...)):
             shutil.rmtree(frame_dir)
         raise e
 
-
-class PresignedUrlRequest(BaseModel):
-    filename: str
-    content_type: str
-
-@app.post("/api/upload/presigned-url")
-async def get_presigned_url(request: PresignedUrlRequest):
-    filename = request.filename
-    content_type = request.content_type
-
-    try:
-        s3_client = boto3.client('s3')
-        bucket_name = 'your-bucket-name'  # Replace with your S3 bucket name
-        presigned_url = s3_client.generate_presigned_url(
-            'put_object',
-            Params={'Bucket': bucket_name, 'Key': filename, 'ContentType': content_type},
-            ExpiresIn=3600  # URL expires in 1 hour
-        )
-        return {"presigned_url": presigned_url}
-    except NoCredentialsError:
-        raise HTTPException(status_code=400, detail="AWS credentials not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 @app.websocket("/ws/analyze")
 async def websocket_endpoint(websocket: WebSocket, job_id: str):

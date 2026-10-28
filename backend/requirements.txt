@@ -1,12 +1,13 @@
 fastapi
 uvicorn
 pydantic
+pydantic-settings
 opencv-python
 httpx
 edge-tts
 openai
 python-multipart
-boto3
+numpy
 
 pytest
 pytest-asyncio
