@@ -22,6 +22,9 @@ The project is tested with mock objects, but it is not yet proven against:
 - long videos
 - actual WebSocket stress/load conditions
 
+### 3b. Frontend/backend contract
+- Frontend still uses the old upload response and `/ws/analyze` without `job_id`; it must move to `POST /api/upload` -> `WS /ws/analyze/{job_id}` -> `GET /api/jobs/{job_id}`
+
 ### 4. Frontend polish
 The frontend is functional and handles core pipeline states, but still relatively minimal:
 - no deeper visual dashboard or timeline analytics
@@ -37,7 +40,6 @@ The repo does not yet present a fully defined deployment strategy for:
 ### 6. Security and operational concerns
 Potential follow-ups include:
 - securing WebSocket access
-- avoiding direct trust of user-supplied file paths
 - controlling backend access to AI services and external endpoints
 
 ## Recommended next steps

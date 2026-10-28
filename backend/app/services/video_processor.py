@@ -72,6 +72,21 @@ def validate_upload_metadata(filename: str, file_size: int) -> None:
         raise ValueError("File size exceeds the maximum limit of 100MB.")
 
 
+def get_video_duration(file_path: str) -> float:
+    """Return the duration in seconds. Raises ValueError if unreadable or fps/frame count are invalid."""
+    cap = cv2.VideoCapture(file_path)
+    try:
+        if not cap.isOpened():
+            raise ValueError("The uploaded video could not be read.")
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        if not fps or fps <= 0 or not frame_count or frame_count <= 0:
+            raise ValueError("The uploaded video could not be read.")
+        return frame_count / fps
+    finally:
+        cap.release()
+
+
 def is_video_corrupt(file_path: str) -> bool:
     """
     Verifies video file integrity using OpenCV by ensuring the container opens
@@ -89,18 +104,3 @@ def is_video_corrupt(file_path: str) -> bool:
         return True
 
     return False
-
-
-async def process_video(video_path: str, frame_dir: str, sample_interval_sec: int = 2) -> List[str]:
-    """Compatibility helper retained for existing upload flow."""
-    frames = extract_frames(video_path, frame_interval_sec=sample_interval_sec)
-    frame_paths: List[str] = []
-    os.makedirs(frame_dir, exist_ok=True)
-
-    for idx, frame in enumerate(frames):
-        image_path = os.path.join(frame_dir, f"frame_{idx}.jpg")
-        with open(image_path, "wb") as out_file:
-            out_file.write(base64.b64decode(frame["image_data"]))
-        frame_paths.append(image_path)
-
-    return frame_paths

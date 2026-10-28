@@ -1,7 +1,3 @@
-### `STATE.md`
-I updated the **Validation & Security helpers** section to explicitly state that the functions are already actively integrated into the `backend/app/main.py` upload pipeline[cite: 1, 3].
-
-```markdown
 This file tracks the current architectural reality and completed features of the LionHype project.
 
 ## What is already implemented
@@ -34,7 +30,7 @@ These helpers are actively integrated into the upload pipeline in `backend/app/m
 `backend/app/services/commentary.py` implements the async commentary pipeline.
 
 Features in place:
-- `process_video_commentary(video_path)` as the core async orchestrator
+- `process_video_commentary(video_path, job_id, progress_cb)` as the core async orchestrator; `job_id` is the `video_id` for the audio folder
 - CPU-bound frame extraction offloaded via `asyncio.to_thread`
 - LLM event timeline generation via `generate_event_timeline(frames)`
 - Concurrent TTS generation via `asyncio.gather`
@@ -66,30 +62,16 @@ Features in place:
 - Fallback behavior if TTS dependency is missing
 - Observability logging for retry wrappers and fallback behavior
 
-#### MCP Soundboard Server
-`backend/mcp_server.py` implements a FastMCP server for LLM-driven sound effects.
+#### FastAPI app, job API and websocket flow
+`backend/app/main.py` (routes), `backend/app/services/jobs.py` (in-memory `JobStore`) and `backend/app/services/pipeline.py` (background runner). Unverified against real footage and the real LLM/TTS; covered by route tests with the LLM and TTS mocked.
 
-Features in place:
-- Exposes a `trigger_sfx` tool to LLM agents
-- Supports effects like gong, cymbals, airhorn, and drumroll
-- Returns structured event strings for timestamp synchronization
-- Designed to integrate with the commentary pipeline for dynamic audio cues
-
-#### FastAPI app and websocket flow
-`backend/app/main.py` implements the API and real-time processing flow.
-
-Features in place:
-- `/api/upload` for video upload handling (including validation constraints)
-- `/api/upload/presigned-url` for generating secure upload URLs
-- `/api/commentary/generate` for direct commentary generation using background tasks
-- `/api/commentary/mock` retained as a deprecated endpoint
-- `@app.websocket("/ws/analyze")` for real-time analysis progress
-- JSON progress messages using canonical phases: `uploading`, `extracting`, `analyzing`, `synthesizing`, `completed`, and `error`
-- Error propagation with standardized 500 JSON responses from the global exception handler
-- Background job tracking via `job_tracker` dictionary for asynchronous commentary generation
-- WebSocket disconnect handling and auto-reconnect logic on the frontend
-
-This is the main runtime entrypoint for the backend app.
+- `POST /api/upload`: validates (filename, extension, size) before writing, saves to `<UPLOAD_DIR>/videos/<job_id>_<safe_name>`, checks the container, creates the job and runs the pipeline via `BackgroundTasks`. Returns `{job_id, filename}`. No frame extraction at upload time.
+- `GET /api/jobs/{job_id}`: `{job_id, status, progress, message, result}`; 404 `{"detail": "Job not found"}`.
+- `WS /ws/analyze/{job_id}`: server-to-client only. Sends the current snapshot, then live updates, and closes 1000 after `completed`/`error`. Unknown job: error message and close 4404. Detects client disconnect while idle and always unsubscribes.
+- Pipeline runner: `process_video_commentary(video_path, job_id=..., progress_cb=...)` drives `extracting`, `analyzing`, `synthesizing`; then `job_store.complete`. On any exception it logs, marks the job `error` with a generic message, and deletes the job's video, frames dir and audio dir. A failing progress callback never aborts the pipeline.
+- Only `<UPLOAD_DIR>/audio` is served statically (`/uploads/audio/...`); videos are never served.
+- Unhandled exceptions return a generic 500 `{"detail": "Internal server error"}` and are logged.
+- Removed: `/api/commentary/generate`, `/api/commentary/mock`, `job_tracker`, `backend/mcp_server.py`, `generate_video_commentary`.
 
 #### Schemas
 `backend/app/schemas/events.py` defines the data models used by the app:
@@ -100,7 +82,7 @@ This is the main runtime entrypoint for the backend app.
 It includes the `audio_url` field needed to attach generated audio to each commentary quip.
 
 #### Deployment & Configuration
-The project is fully Dockerized via `docker-compose`, providing a consistent environment for development and production. It uses a strict `.env` configuration pattern to manage external AI provider credentials and settings, with built-in retry logic for resilient service communication.
+Docker is untested and not part of the MVP; the app runs natively. Configuration uses a `.env` pattern to manage external AI provider credentials and settings, with built-in retry logic for resilient service communication.
 
 ### Frontend
 
@@ -109,7 +91,7 @@ The frontend lives in `frontend/src`.
 #### App-level flow
 `frontend/src/App.jsx` does the following:
 - Accepts video upload input and posts it to the backend
-- Opens a WebSocket to `ws://backend:8000/ws/analyze`
+- Opens a WebSocket to `/ws/analyze` (not yet updated to the job API: still needs `job_id` and the new upload response)
 - Tracks backend processing messages across canonical phases (`uploading`, `extracting`, `analyzing`, `synthesizing`, `completed`, `error`)
 - Updates UI status/progress indicators and pipeline stage labels
 - Stores final commentary quips when processing completes
@@ -127,12 +109,10 @@ Features in place:
 - Includes audio controls for the synthesized clips
 
 ### Testing
-`backend/tests/test_main.py` contains mocked integration-style tests covering:
-- frame extraction payload structure
-- commentary generation with audio mapping
-- WebSocket flow for final output exchange
-
-These tests mock OpenCV capture, LLM output, and TTS generation so they can run in CI without actual video hardware or paid external APIs.
+32 backend tests, all passing. LLM and TTS are mocked; everything else is real.
+- `tests/test_jobs.py`: JobStore behavior
+- `tests/test_main.py`: frame extraction, commentary orchestration, progress callback, TTS failure handling
+- `tests/test_api.py`: upload, GET job, WebSocket (replay, 4404, live progress, idle disconnect), pipeline failure cleanup, videos not served
 
 ## Current maturity assessment
 
@@ -143,3 +123,9 @@ This repo is best categorized as:
 - not yet a hardened shipped product.
 
 The main architecture and flow are in place. The remaining work is mostly about robustness, real-world validation, operational polish, and deployment readiness.
+
+## Safety and cleanup (session 3B)
+- Only `<UPLOAD_DIR>/audio` is served (`/uploads/audio`). Uploads over `MAX_VIDEO_SECONDS` (default 90) or unreadable are rejected with 400 and their file is deleted.
+- Unhandled errors return `{"detail": "Internal server error"}` and are logged; logging is configured in `app/main.py`.
+- Any failure after the first disk write deletes the job's files. A lifespan task purges expired jobs and their files every `CLEANUP_INTERVAL_SECONDS` (600).
+- `llm.py` and `tts.py` use the shared `settings`. `backend/.env.example` lists all settings.

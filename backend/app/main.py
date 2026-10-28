@@ -1,20 +1,50 @@
 import asyncio
+import contextlib
+import logging
 import os
 import shutil
 import uuid
 
-from fastapi import FastAPI, File, UploadFile, WebSocket, WebSocketDisconnect, HTTPException, Request, BackgroundTasks
-from app.services.video_processor import validate_upload_metadata, sanitize_filename, is_video_corrupt
+from fastapi import FastAPI, File, UploadFile, WebSocket, WebSocketDisconnect, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
-from app.schemas.events import CommentaryResponse
-from app.services.commentary import process_video_commentary, generate_video_commentary
-from app.services.video_processor import process_video
+from app.services.jobs import TERMINAL, JobNotFoundError, job_store
+from app.services.pipeline import cleanup_job_files, run_pipeline
+from app.services.video_processor import validate_upload_metadata, sanitize_filename, is_video_corrupt, get_video_duration
 
-app = FastAPI()
+logging.basicConfig(
+    level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+logger = logging.getLogger("lionhype.main")
+
+
+async def _cleanup_loop() -> None:
+    while True:
+        await asyncio.sleep(settings.CLEANUP_INTERVAL_SECONDS)
+        try:
+            paths = job_store.video_paths()
+            for job_id in job_store.purge_expired():
+                cleanup_job_files(job_id, paths.get(job_id, ""))
+        except Exception:
+            logger.exception("Periodic cleanup failed")
+
+
+@contextlib.asynccontextmanager
+async def lifespan(_: FastAPI):
+    task = asyncio.create_task(_cleanup_loop())
+    try:
+        yield
+    finally:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
+
+app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -22,115 +52,113 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-UPLOAD_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "uploads"))
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+VIDEO_DIR = os.path.join(settings.UPLOAD_DIR, "videos")
+AUDIO_DIR = os.path.join(settings.UPLOAD_DIR, "audio")
+os.makedirs(VIDEO_DIR, exist_ok=True)
+os.makedirs(AUDIO_DIR, exist_ok=True)
+# Only audio is served; videos are never exposed.
+app.mount("/uploads/audio", StaticFiles(directory=AUDIO_DIR), name="audio")
 
 
 @app.exception_handler(Exception)
 async def global_exception_handler(_, exc: Exception):
-    return JSONResponse(status_code=500, content={"detail": str(exc) or "Internal server error"})
+    logger.error("Unhandled error", exc_info=exc)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 @app.post("/api/upload")
-async def upload_video(file: UploadFile = File(...)):
-    video_id = str(uuid.uuid4())
-    base_dir = os.path.abspath(os.path.dirname(__file__))
-    upload_dir = os.path.join(base_dir, "..", "uploads")
-    os.makedirs(upload_dir, exist_ok=True)
+async def upload_video(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="A filename is required.")
+    safe_name = sanitize_filename(file.filename)
+    if not safe_name:
+        raise HTTPException(status_code=400, detail="Invalid filename.")
 
-    # Sanitize filename
-    safe_name = sanitize_filename(file.filename or f"upload_{video_id}.mp4")
-    video_path = os.path.join(upload_dir, safe_name)
-    frame_dir = os.path.join(upload_dir, "frames", video_id)
-    os.makedirs(frame_dir, exist_ok=True)
-
+    file_size = file.size
+    if file_size is None:
+        file.file.seek(0, 2)
+        file_size = file.file.tell()
+        file.file.seek(0)
     try:
-        # Determine file size for validation
-        file_size = file.size
-        if file_size is None:
-            file.file.seek(0, 2)
-            file_size = file.file.tell()
-            file.file.seek(0)
+        validate_upload_metadata(safe_name, file_size)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-        # Enforce strict file validation (extension & size)
+    job_id = uuid.uuid4().hex
+    video_path = os.path.join(VIDEO_DIR, f"{job_id}_{safe_name}")
+    try:
+        def _save() -> None:
+            with open(video_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+
+        await asyncio.to_thread(_save)
+        if await asyncio.to_thread(is_video_corrupt, video_path):
+            raise HTTPException(status_code=400, detail="The uploaded video file is corrupt.")
         try:
-            validate_upload_metadata(file.filename, file_size)
+            duration = await asyncio.to_thread(get_video_duration, video_path)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
-
-        with open(video_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        # Verify container integrity before proceeding with processing
-        if is_video_corrupt(video_path):
-            os.remove(video_path)
-            raise HTTPException(status_code=400, detail="The uploaded video file is corrupt.")
-
-        frame_paths = await process_video(video_path, frame_dir, sample_interval_sec=2)
-        return JSONResponse(content={"video_id": video_id, "video_path": video_path, "frame_paths": frame_paths})
-    except HTTPException:
-        # Re-raise validation/processing HTTP exceptions directly
+        if duration > settings.MAX_VIDEO_SECONDS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Video is too long. Maximum length is {settings.MAX_VIDEO_SECONDS:g} seconds.",
+            )
+        job_store.create(video_path, job_id=job_id)
+    except BaseException:
+        cleanup_job_files(job_id, video_path)
         raise
-    except Exception as e:
-        # Clean up uploaded files on unexpected failure
-        if os.path.exists(video_path):
-            os.remove(video_path)
-        if os.path.exists(frame_dir):
-            shutil.rmtree(frame_dir)
-        raise e
+
+    background_tasks.add_task(run_pipeline, job_id, video_path)
+    return {"job_id": job_id, "filename": safe_name}
 
 
-@app.websocket("/ws/analyze")
+@app.get("/api/jobs/{job_id}")
+async def get_job(job_id: str):
+    try:
+        job = job_store.get(job_id)
+    except JobNotFoundError:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return {
+        "job_id": job.job_id,
+        "status": job.status,
+        "progress": job.progress,
+        "message": job.message,
+        "result": job.result.model_dump() if job.result else None,
+    }
+
+
+@app.websocket("/ws/analyze/{job_id}")
 async def websocket_endpoint(websocket: WebSocket, job_id: str):
     await websocket.accept()
     try:
-        while True:
-            payload = await websocket.receive_json()
-            video_path = payload.get("video_path")
-            if not video_path:
-                raise ValueError("video_path is required")
+        job_store.get(job_id)
+    except JobNotFoundError:
+        await websocket.send_json({"status": "error", "progress": 0, "message": "Job not found"})
+        await websocket.close(code=4404)
+        return
 
-            await websocket.send_json({"status": "processing", "progress": 15, "message": "extracting"})
-            commentary = await process_video_commentary(video_path)
-            await websocket.send_json({"status": "processing", "progress": 70, "message": "analyzing"})
-            await websocket.send_json({"status": "processing", "progress": 90, "message": "synthesizing"})
-            await websocket.send_json({
-                "status": "completed",
-                "progress": 100,
-                "message": "completed",
-                "quips": [quip.model_dump() for quip in commentary.quips],
-            })
-    except WebSocketDisconnect:
-        await websocket.close()
-    except Exception as exc:
-        await websocket.send_json({"status": "error", "progress": 100, "message": str(exc)})
-
-
-@app.post("/api/commentary/mock", response_model=CommentaryResponse, deprecated=True)
-async def get_mock_commentary(payload: dict | None = None):
-    payload = payload or {}
-    video_path = payload.get("video_path")
-    if not video_path:
-        raise ValueError("video_path is required for commentary generation; /api/commentary/mock is deprecated")
-    return await process_video_commentary(video_path)
-
-
-@app.post("/api/commentary/generate", response_model=CommentaryResponse)
-async def generate_commentary_endpoint(video_url: str, background_tasks: BackgroundTasks):
-    job_id = str(uuid.uuid4())
-    job_tracker[job_id] = {"status": "pending", "video_url": video_url}
-    background_tasks.add_task(process_commentary_background, job_id, video_url)
-    return JSONResponse(content={"job_id": job_id}, status_code=202)
-# Job tracking dictionary
-job_tracker = {}
-
-async def process_commentary_background(job_id: str, video_url: str):
+    queue = job_store.subscribe(job_id)
+    recv = asyncio.ensure_future(websocket.receive_text())
+    get = None
     try:
-        job_tracker[job_id]["status"] = "processing"
-        commentary = await generate_video_commentary(video_url)
-        job_tracker[job_id]["status"] = "completed"
-        job_tracker[job_id]["commentary"] = commentary
-    except Exception as exc:
-        job_tracker[job_id]["status"] = "error"
-        job_tracker[job_id]["error"] = str(exc)
+        while True:
+            if get is None:
+                get = asyncio.ensure_future(queue.get())
+            done, _ = await asyncio.wait({get, recv}, return_when=asyncio.FIRST_COMPLETED)
+            if get in done:
+                snap = get.result()
+                get = None
+                await websocket.send_json(snap)
+                if snap["status"] in TERMINAL:
+                    await websocket.close(code=1000)
+                    return
+            if recv in done:
+                recv.result()  # raises WebSocketDisconnect when the client leaves
+                recv = asyncio.ensure_future(websocket.receive_text())  # ignore client messages
+    except WebSocketDisconnect:
+        pass
+    finally:
+        for task in (get, recv):
+            if task is not None and not task.done():
+                task.cancel()
+        job_store.unsubscribe(job_id, queue)

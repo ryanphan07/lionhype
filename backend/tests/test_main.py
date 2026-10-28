@@ -2,16 +2,11 @@ import base64
 
 import numpy as np
 import pytest
-from fastapi.testclient import TestClient
-
-from app.schemas.events import CommentaryQuip, CommentaryResponse
+from app.schemas.events import CommentaryResponse
 from app.services import commentary as commentary_module
 from app.services import llm as llm_module
 from app.services import tts as tts_module
 from app.services import video_processor
-from app.main import app
-
-client = TestClient(app)
 
 
 class DummyVideoCapture:
@@ -39,6 +34,10 @@ class DummyVideoCapture:
         self.index = len(self.frames)
 
 
+async def fake_tts(quip, video_id=None):
+    return {"timestamp": quip["timestamp"], "text": quip["text"], "audio_url": "http://example.com/clip.mp3"}
+
+
 @pytest.mark.parametrize("frame_interval_sec", [1.0])
 def test_extract_frames_returns_timestamped_payload(monkeypatch, frame_interval_sec):
     frames = [np.zeros((720, 1280, 3), dtype=np.uint8) for _ in range(4)]
@@ -52,8 +51,6 @@ def test_extract_frames_returns_timestamped_payload(monkeypatch, frame_interval_
     assert isinstance(extracted[0]["image_data"], str)
     assert base64.b64decode(extracted[0]["image_data"])
 
-
-import pytest
 
 @pytest.mark.anyio
 async def test_process_video_commentary_maps_audio_to_quips(monkeypatch):
@@ -85,25 +82,6 @@ async def test_process_video_commentary_maps_audio_to_quips(monkeypatch):
     assert result.quips[1].text == "second quip"
 
 
-def test_ws_analyze_returns_final_payload(monkeypatch):
-    async def fake_process_video_commentary(_):
-        return CommentaryResponse(quips=[CommentaryQuip(timestamp=1.25, text="quips", audio_url="http://example.com/clip.mp3")])
-
-    monkeypatch.setattr("app.main.process_video_commentary", fake_process_video_commentary)
-
-    with client.websocket_connect("/ws/analyze?job_id=test-job") as websocket:
-        websocket.send_json({"video_path": "fake.mp4"})
-        first = websocket.receive_json()
-        second = websocket.receive_json()
-        third = websocket.receive_json()
-        fourth = websocket.receive_json()
-
-    assert first["status"] == "processing"
-    assert first["message"] == "extracting"
-    assert fourth["status"] == "completed"
-    assert fourth["quips"][0]["text"] == "quips"
-
-
 @pytest.mark.anyio
 async def test_job_id_forwarded_to_tts(monkeypatch):
     captured_video_id = []
@@ -129,7 +107,7 @@ async def test_progress_cb_receives_statuses_in_order(monkeypatch):
     monkeypatch.setattr(commentary_module.video_processor_service, "extract_frames", lambda _: [{"timestamp": 0.0, "image_data": "abc"}])
     async def fake_llm(frames): return [{"timestamp": 0.0, "text": "quip"}]
     monkeypatch.setattr(llm_module, "generate_event_timeline", fake_llm)
-    monkeypatch.setattr(tts_module, "generate_audio_clip", lambda q, video_id=None: {"timestamp": q["timestamp"], "text": q["text"], "audio_url": "http://example.com/clip.mp3"})
+    monkeypatch.setattr(tts_module, "generate_audio_clip", fake_tts)
 
     await commentary_module.process_video_commentary("fake.mp4", progress_cb=fake_progress_cb)
     
@@ -149,11 +127,12 @@ async def test_progress_cb_raises_does_not_break_pipeline(monkeypatch):
     monkeypatch.setattr(commentary_module.video_processor_service, "extract_frames", lambda _: [{"timestamp": 0.0, "image_data": "abc"}])
     async def fake_llm(frames): return [{"timestamp": 0.0, "text": "quip"}]
     monkeypatch.setattr(llm_module, "generate_event_timeline", fake_llm)
-    monkeypatch.setattr(tts_module, "generate_audio_clip", lambda q, video_id=None: {"timestamp": q["timestamp"], "text": q["text"], "audio_url": "http://example.com/clip.mp3"})
+    monkeypatch.setattr(tts_module, "generate_audio_clip", fake_tts)
 
     result = await commentary_module.process_video_commentary("fake.mp4", progress_cb=fake_progress_cb)
     assert isinstance(result, CommentaryResponse)
     assert len(result.quips) == 1
+    assert result.quips[0].audio_url == "http://example.com/clip.mp3"
 
 
 @pytest.mark.anyio

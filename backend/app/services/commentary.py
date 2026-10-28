@@ -27,8 +27,8 @@ async def process_video_commentary(
     job_id: Optional[str] = None,
     progress_cb: Optional[Callable[[str, int, Optional[str]], Awaitable[None]]] = None
 ) -> CommentaryResponse:
-    logger.info("Starting commentary generation for video_id: %s", video_path)
     video_id = job_id or "default"
+    logger.info("Starting commentary generation for video_id: %s", video_id)
 
     async def _report(status: str, progress: int, message: Optional[str] = None) -> None:
         if progress_cb is None:
@@ -92,24 +92,3 @@ async def process_video_commentary(
         logger.error("All TTS clips failed for video_id: %s", video_id)
 
     return CommentaryResponse(quips=quips)
-
-
-async def generate_video_commentary(video_id: str) -> CommentaryResponse:
-    """Backward-compatible wrapper for the older video-id-based API."""
-    from pathlib import Path
-
-    candidate_paths = [
-        Path("backend/uploads/frames") / video_id,
-        Path("uploads/frames") / video_id,
-        Path("backend") / "uploads" / "frames" / video_id,
-    ]
-
-    for frame_dir in candidate_paths:
-        if frame_dir.exists():
-            frame_paths = sorted(frame_dir.glob("*.jpg"))
-            frames = []
-            for frame_path in frame_paths:
-                frames.append({"timestamp": float(frame_path.stem.split("_")[-1]) if frame_path.stem.split("_")[-1].replace(".", "", 1).isdigit() else 0.0, "image_data": ""})
-            return await process_video_commentary(str(frame_dir.parent / "video.mp4"))
-
-    return CommentaryResponse(quips=[])

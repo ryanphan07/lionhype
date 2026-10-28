@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
 
     JOB_TTL_SECONDS: int = 3600
+    CLEANUP_INTERVAL_SECONDS: int = 600
+    MAX_VIDEO_SECONDS: float = 90.0
     CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:3000"]
     PUBLIC_BASE_URL: str = "http://localhost:8000"
     UPLOAD_DIR: str = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "uploads"))

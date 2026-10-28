@@ -9,7 +9,7 @@ import time
 import uuid
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.config import settings
 from app.schemas.events import CommentaryResponse
@@ -31,8 +31,8 @@ class Job(BaseModel):
     progress: int = 0
     message: Optional[str] = None
     result: Optional[CommentaryResponse] = None
-    created_at: float = time.time()
-    updated_at: float = time.time()
+    created_at: float = Field(default_factory=time.time)
+    updated_at: float = Field(default_factory=time.time)
 
 
 def snapshot(job: Job) -> dict:
@@ -125,6 +125,9 @@ class JobStore:
                 self._subscribers[job_id].remove(queue)
             except ValueError:
                 pass
+
+    def video_paths(self) -> dict[str, str]:
+        return {job_id: job.video_path for job_id, job in self._jobs.items()}
 
     def purge_expired(self) -> list[str]:
         now = time.time()

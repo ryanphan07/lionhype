@@ -1,29 +1,32 @@
-# Handoff: Session 2 (build and start)
+# Handoff: Session 3B (safety, errors, cleanup)
 
 ## 1. Done
-- backend/main.py deleted; tests/test_main.py retargeted to `app.main` (ws test now uses `?job_id=test-job`).
-- app/main.py: removed presigned-URL endpoint + boto3; added CORSMiddleware from `settings.CORS_ORIGINS`.
-- app/config.py: `.env` resolved relative to config.py; new `CORS_ORIGINS` (default :5173, :3000).
-- requirements.txt: dropped boto3, added pydantic-settings and numpy (tests import it); pytest deps kept in the same file.
-- Untracked .history/ (root and backend/) and repomix-output.xml; .gitignore typo fixed.
-- frontend: react-toastify ^11 added (lockfile updated), 3 lint errors fixed, `VITE_API_BASE` drives HTTP and WS URLs, `.env.example` added.
-- CONVENTIONS.md Commands updated.
+- config.py: `MAX_VIDEO_SECONDS=90`, `CLEANUP_INTERVAL_SECONDS=600`. .env.example (new, backend/) lists all settings.
+- video_processor.py: `get_video_duration()` (cap released in finally; fps/frame count <= 0 invalid -> ValueError).
+- main.py: logging.basicConfig (timestamp, level, logger name); lifespan runs `_cleanup_loop` (purge_expired every interval, logs and survives exceptions, cancelled on shutdown); upload checks duration, cleans up via `cleanup_job_files` on any failure incl. HTTPException; `job_store.create` now happens inside the guarded block.
+- jobs.py: `video_paths()` helper so purged jobs' videos can be deleted (purge_expired still returns ids).
+- llm.py, tts.py: use shared `settings`.
+- Tests: +7 in tests/test_api.py (video not served, too long, bad fps, duration helper, generic 500, cleanup on save failure, cleanup loop).
+- Docs: STATE.md section, TASKS.md duration item removed, CONVENTIONS test count 39.
 
 ## 2. Decisions and deviations
-- Unused `errorMessage` state: destructured as `[, setErrorMessage]` (no UI change; session for rewiring should display it).
-- mcp_server.py left untouched as instructed. Did not split dev deps into a separate file (single requirements.txt).
+- Static mount was already audio-only from 3A; added a test with a real file on disk.
+- Global 500 handler and no `str(exc)` were already done in 3A. Remaining `str(e)` in main.py are our own validation messages (400), not raw exceptions.
+- `except HTTPException: raise` did not exist; the old `except BaseException` only removed the video, now calls `cleanup_job_files`.
+- Duration of 90.0 exactly is allowed; computed as frame_count/fps (container metadata).
+- Nothing committed.
 
 ## 3. Results
-- pytest backend/tests -q: PASS, 20. npm run lint: PASS. npm run build: PASS.
-- Fresh venv: pip install -r requirements.txt OK; uvicorn started, `OPTIONS /api/upload` from Origin :5173 returned allow-origin, `GET /openapi.json` 200; server stopped.
+- pytest backend/tests -q: PASS, 39. Frontend untouched, lint/build not run.
 
 ## 4. Not verified
-- Browser upload through the Vite dev server (frontend flow is still mismatched with the backend).
-- Overriding CORS_ORIGINS/.env from a different cwd (code path only).
+- Real upload with real LLM/TTS and footage; cleanup loop timing in a live server (10 min).
+- Duration for files with wrong container metadata (e.g. some .mov).
 
 ## 5. Open issues and risks
-- Frontend/backend contract still mismatched (App.jsx ws URL `/ws/analyze` without job_id vs app/main.py ws route).
-- Everything else in docs/AUDIT.md sessions 2-6 is untouched.
+- main.py upload: size still from client-declared multipart size, not streamed-capped.
+- tts.py silently falls back to fake audio on TTS failure.
+- JobStore in-memory, single process; purge only removes terminal jobs.
 
 ## 6. Suggested next session
-AUDIT session 2: job API per CONVENTIONS (job_id, JobStore, WS /ws/analyze/{job_id}, GET /api/jobs/{id}, server-owned paths, 90s limit).
+Frontend rewire to the job API (upload -> WS by job_id -> GET result).

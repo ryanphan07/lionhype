@@ -3,7 +3,7 @@ import json
 import logging
 from typing import Any, Dict, List
 
-from app.config import Settings
+from app.config import settings
 from app.schemas.events import CommentaryResponse, EventTimeline
 
 logger = logging.getLogger("lionhype.llm")
@@ -12,8 +12,6 @@ try:
     from openai import AsyncOpenAI
 except ImportError:  # pragma: no cover - optional dependency in lightweight CI
     AsyncOpenAI = None
-
-settings = Settings()
 
 llm_client = AsyncOpenAI(
     base_url=settings.LLM_BASE_URL,

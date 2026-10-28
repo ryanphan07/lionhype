@@ -1,0 +1,288 @@
+import os
+
+import cv2
+import numpy as np
+import pytest
+from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
+
+from app import main as main_module
+from app.config import settings
+from app.main import app
+from app.schemas.events import CommentaryQuip, CommentaryResponse
+from app.services import llm as llm_module
+from app.services import pipeline as pipeline_module
+from app.services import tts as tts_module
+from app.services.jobs import job_store
+
+
+@pytest.fixture
+def upload_dir(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "UPLOAD_DIR", str(tmp_path))
+    monkeypatch.setattr(main_module, "VIDEO_DIR", str(tmp_path / "videos"))
+    os.makedirs(tmp_path / "videos")
+    return tmp_path
+
+
+@pytest.fixture
+def client(upload_dir):
+    with TestClient(app) as c:
+        yield c
+
+
+@pytest.fixture
+def fake_ai(monkeypatch):
+    async def fake_llm(frames):
+        return [{"timestamp": 0.0, "text": "first"}, {"timestamp": 1.0, "text": "second"}]
+
+    async def fake_tts(quip, video_id=None):
+        return {"timestamp": quip["timestamp"], "text": quip["text"], "audio_url": f"http://test/{video_id}/{quip['timestamp']}.mp3"}
+
+    monkeypatch.setattr(llm_module, "generate_event_timeline", fake_llm)
+    monkeypatch.setattr(tts_module, "generate_audio_clip", fake_tts)
+
+
+@pytest.fixture
+def video_bytes(tmp_path):
+    path = str(tmp_path / "src.avi")
+    writer = cv2.VideoWriter(path, cv2.VideoWriter_fourcc(*"MJPG"), 5.0, (64, 64))
+    for i in range(15):
+        writer.write(np.full((64, 64, 3), i * 10, dtype=np.uint8))
+    writer.release()
+    with open(path, "rb") as f:
+        return f.read()
+
+
+def upload(client, data, name="clip.avi"):
+    return client.post("/api/upload", files={"file": (name, data, "video/x-msvideo")})
+
+
+def test_upload_runs_pipeline_and_completes(client, upload_dir, fake_ai, video_bytes):
+    resp = upload(client, video_bytes, "../my clip!.avi")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body) == {"job_id", "filename"}
+    assert body["filename"] == "my_clip_.avi"
+    assert str(upload_dir) not in resp.text
+
+    job = client.get(f"/api/jobs/{body['job_id']}").json()
+    assert job["status"] == "completed"
+    assert job["progress"] == 100
+    assert [q["text"] for q in job["result"]["quips"]] == ["first", "second"]
+    assert job["result"]["quips"][0]["audio_url"].startswith(f"http://test/{body['job_id']}/")
+    assert os.path.exists(upload_dir / "videos" / f"{body['job_id']}_my_clip_.avi")
+    assert not (upload_dir / "frames").exists()
+
+
+def test_upload_rejects_bad_extension_without_writing(client, upload_dir, video_bytes):
+    resp = upload(client, video_bytes, "evil.exe")
+    assert resp.status_code == 400
+    assert os.listdir(upload_dir / "videos") == []
+
+
+def test_upload_rejects_missing_filename(client, upload_dir, video_bytes):
+    resp = client.post("/api/upload", files={"file": ("", video_bytes, "video/x-msvideo")})
+    assert resp.status_code in (400, 422)
+    assert os.listdir(upload_dir / "videos") == []
+
+
+def test_upload_rejects_corrupt_video_and_removes_file(client, upload_dir):
+    resp = upload(client, b"not a video")
+    assert resp.status_code == 400
+    assert os.listdir(upload_dir / "videos") == []
+
+
+def test_pipeline_failure_marks_error_and_cleans_up(client, upload_dir, video_bytes, monkeypatch):
+    async def boom(frames):
+        raise RuntimeError("secret internal detail")
+
+    monkeypatch.setattr(llm_module, "generate_event_timeline", boom)
+    job_id = upload(client, video_bytes).json()["job_id"]
+
+    job = client.get(f"/api/jobs/{job_id}").json()
+    assert job["status"] == "error"
+    assert job["message"] == "Commentary generation failed"
+    assert "secret" not in str(job)
+    assert os.listdir(upload_dir / "videos") == []
+    assert not (upload_dir / "audio" / job_id).exists()
+
+
+@pytest.mark.anyio
+async def test_run_pipeline_survives_failing_progress_update(upload_dir, fake_ai, video_bytes, monkeypatch):
+    path = str(upload_dir / "v.avi")
+    with open(path, "wb") as f:
+        f.write(video_bytes)
+    job_store.create(path, job_id="cbfail")
+    real_update = job_store.update
+
+    def bad_update(job_id, status, progress, message=None):
+        if status != "completed":
+            raise RuntimeError("update broke")
+        return real_update(job_id, status, progress, message)
+
+    monkeypatch.setattr(job_store, "update", bad_update)
+    await pipeline_module.run_pipeline("cbfail", path)
+    assert job_store.get("cbfail").status == "completed"
+
+
+def test_get_unknown_job_404(client):
+    resp = client.get("/api/jobs/nope")
+    assert resp.status_code == 404
+    assert resp.json() == {"detail": "Job not found"}
+
+
+def test_ws_replays_completed_job_and_closes(client):
+    job_store.create("x.mp4", job_id="done1")
+    job_store.complete("done1", CommentaryResponse(quips=[CommentaryQuip(timestamp=0, text="hi")]))
+    with client.websocket_connect("/ws/analyze/done1") as ws:
+        msg = ws.receive_json()
+        assert msg["status"] == "completed"
+        assert msg["progress"] == 100
+        assert "result" not in msg and "quips" not in msg
+        with pytest.raises(WebSocketDisconnect) as exc:
+            ws.receive_json()
+        assert exc.value.code == 1000
+
+
+def test_ws_unknown_job_4404(client):
+    with client.websocket_connect("/ws/analyze/missing") as ws:
+        assert ws.receive_json() == {"status": "error", "progress": 0, "message": "Job not found"}
+        with pytest.raises(WebSocketDisconnect) as exc:
+            ws.receive_json()
+        assert exc.value.code == 4404
+
+
+def test_ws_streams_live_progress_and_unsubscribes(client):
+    job_store.create("x.mp4", job_id="live1")
+    with client.websocket_connect("/ws/analyze/live1") as ws:
+        assert ws.receive_json()["status"] == "uploading"
+        client.portal.call(job_store.update, "live1", "extracting", 10)
+        assert ws.receive_json() == {"status": "extracting", "progress": 10}
+        client.portal.call(job_store.update, "live1", "analyzing", 40, "thinking")
+        assert ws.receive_json() == {"status": "analyzing", "progress": 40, "message": "thinking"}
+        client.portal.call(job_store.fail, "live1", "Commentary generation failed")
+        msg = ws.receive_json()
+        assert msg["status"] == "error" and msg["message"] == "Commentary generation failed"
+        with pytest.raises(WebSocketDisconnect) as exc:
+            ws.receive_json()
+        assert exc.value.code == 1000
+    assert job_store._subscribers["live1"] == []
+
+
+def test_ws_client_disconnect_while_idle_unsubscribes(client):
+    job_store.create("x.mp4", job_id="idle1")
+    with client.websocket_connect("/ws/analyze/idle1") as ws:
+        assert ws.receive_json()["status"] == "uploading"
+    for _ in range(50):
+        if job_store._subscribers.get("idle1") == []:
+            break
+        client.portal.call(lambda: None)
+    assert job_store._subscribers["idle1"] == []
+
+
+def test_videos_are_not_served(client, upload_dir, fake_ai, video_bytes):
+    job_id = upload(client, video_bytes).json()["job_id"]
+    assert client.get(f"/uploads/videos/{job_id}_clip.avi").status_code == 404
+
+
+def test_video_file_on_disk_is_not_served(client):
+    real_video_dir = os.path.join(os.path.dirname(main_module.__file__), "..", "uploads", "videos")
+    os.makedirs(real_video_dir, exist_ok=True)
+    probe = os.path.join(real_video_dir, "probe_serving_test.avi")
+    with open(probe, "wb") as f:
+        f.write(b"x")
+    try:
+        assert client.get("/uploads/videos/probe_serving_test.avi").status_code == 404
+        assert client.get("/uploads/probe_serving_test.avi").status_code == 404
+    finally:
+        os.remove(probe)
+
+
+def test_upload_rejects_too_long_video_and_removes_file(client, upload_dir, video_bytes, monkeypatch):
+    monkeypatch.setattr(settings, "MAX_VIDEO_SECONDS", 1.0)
+    resp = upload(client, video_bytes)  # 3s clip
+    assert resp.status_code == 400
+    assert "too long" in resp.json()["detail"]
+    assert os.listdir(upload_dir / "videos") == []
+
+
+def test_upload_rejects_zero_fps_video_and_removes_file(client, upload_dir, video_bytes, monkeypatch):
+    monkeypatch.setattr(main_module, "get_video_duration", lambda p: (_ for _ in ()).throw(ValueError("The uploaded video could not be read.")))
+    resp = upload(client, video_bytes)
+    assert resp.status_code == 400
+    assert os.listdir(upload_dir / "videos") == []
+
+
+def test_get_video_duration_and_invalid_fps(video_bytes, tmp_path, monkeypatch):
+    from app.services import video_processor as vp
+
+    path = str(tmp_path / "d.avi")
+    with open(path, "wb") as f:
+        f.write(video_bytes)
+    assert vp.get_video_duration(path) == pytest.approx(3.0, abs=0.3)
+
+    class FakeCap:
+        released = False
+        def isOpened(self): return True
+        def get(self, prop): return 0
+        def release(self): FakeCap.released = True
+
+    monkeypatch.setattr(vp.cv2, "VideoCapture", lambda p: FakeCap())
+    with pytest.raises(ValueError):
+        vp.get_video_duration(path)
+    assert FakeCap.released
+
+
+def test_unhandled_error_returns_generic_500(upload_dir, monkeypatch):
+    def boom(_):
+        raise RuntimeError("secret internal detail")
+
+    monkeypatch.setattr(main_module.job_store, "get", boom)
+    with TestClient(app, raise_server_exceptions=False) as c:
+        resp = c.get("/api/jobs/anything")
+    assert resp.status_code == 500
+    assert resp.json() == {"detail": "Internal server error"}
+
+
+def test_save_failure_cleans_up_partial_file(client, upload_dir, video_bytes, monkeypatch):
+    monkeypatch.setattr(main_module, "is_video_corrupt", lambda p: (_ for _ in ()).throw(OSError("disk")))
+    resp = TestClient(app, raise_server_exceptions=False).post(
+        "/api/upload", files={"file": ("clip.avi", video_bytes, "video/x-msvideo")}
+    )
+    assert resp.status_code == 500
+    assert os.listdir(upload_dir / "videos") == []
+
+
+@pytest.mark.anyio
+async def test_cleanup_loop_purges_files_survives_errors_and_cancels(upload_dir, monkeypatch):
+    import asyncio
+
+    monkeypatch.setattr(settings, "CLEANUP_INTERVAL_SECONDS", 0.01)
+    video = upload_dir / "videos" / "old_clip.avi"
+    video.write_bytes(b"x")
+    (upload_dir / "audio" / "oldjob").mkdir(parents=True)
+    job_store.create(str(video), job_id="oldjob")
+    job_store.fail("oldjob", "x")
+    job_store.get("oldjob").updated_at = 0
+
+    calls = {"n": 0}
+    real_purge = job_store.purge_expired
+
+    def flaky():
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("boom")
+        return real_purge()
+
+    monkeypatch.setattr(job_store, "purge_expired", flaky)
+    task = asyncio.create_task(main_module._cleanup_loop())
+    for _ in range(100):
+        await asyncio.sleep(0.02)
+        if not video.exists():
+            break
+    assert not video.exists()
+    assert not (upload_dir / "audio" / "oldjob").exists()
+    assert calls["n"] >= 2  # survived the first exception
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task

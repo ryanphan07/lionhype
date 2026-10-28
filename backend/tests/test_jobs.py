@@ -151,3 +151,12 @@ async def test_complete_stores_result(store):
     assert job.result is result
     assert job.progress == 100
     assert job.message == "Commentary ready"
+
+
+@pytest.mark.anyio
+async def test_timestamps_are_per_instance(store):
+    first = store.create("a.mp4", job_id="a")
+    await asyncio.sleep(0.01)
+    second = store.create("b.mp4", job_id="b")
+    assert second.created_at > first.created_at
+    assert second.updated_at > first.updated_at

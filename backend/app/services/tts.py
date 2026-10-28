@@ -5,7 +5,7 @@ import os
 import re
 from typing import Any, Dict, List, Optional
 
-from app.config import Settings
+from app.config import settings
 
 logger = logging.getLogger("lionhype.tts")
 
@@ -13,8 +13,6 @@ try:
     from edge_tts import Communicate
 except ImportError:  # pragma: no cover
     Communicate = None
-
-settings = Settings()
 
 async def _retry_tts_call(func, max_retries=settings.TTS_MAX_RETRIES, base_delay=1.0, timeout=settings.TTS_TIMEOUT):
     last_exc = None
