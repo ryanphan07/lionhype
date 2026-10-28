@@ -33,7 +33,8 @@ The browser keeps the file as a blob URL for playback; the server never serves v
 - A window that fails (transport error, unusable JSON after one retry) fails the whole job. A job with zero usable quips fails.
 - TTS failures never fail the job: the quip is kept with `audio_url: null, duration_sec: null`; if no clip has audio the job message is "Commentary ready (audio unavailable)".
 - `schedule_quips`: audio quips are processed in time order and may not start before the previous audio ends + 0.3 s; shift up to `MAX_SHIFT_SEC` (2.0) else drop; no-audio quips never block. Every shift/drop is logged.
-- Cleanup: failure deletes video, frames and audio for the job; a loop purges expired jobs (TTL 1 h) and their files. Files orphaned by a server restart are not swept (F4).
+- Cleanup: failure deletes video, frames and audio for the job; success deletes the source video immediately (audio stays until the job expires); a loop purges expired jobs (TTL 1 h) and their files; startup sweeps `uploads/videos` and `uploads/audio` (the store is empty then).
+- One job at a time: an upload while another job is running gets HTTP 409. (No queue.)
 - Removed earlier: `/api/commentary/*`, presigned/boto3 endpoint, `backend/main.py`, `mcp_server.py`, canned LLM output, fake audio, 224x224 JSON-text frames.
 
 ## Frontend (`frontend/src/`)
@@ -41,7 +42,7 @@ The browser keeps the file as a blob URL for playback; the server never serves v
 - `components/VideoPlayer.jsx`: blob-URL video, quip queue driven by `timeupdate`, one clip at a time, video ducked to 0.3 while a clip plays, stale lines (older than 4 s) skipped, seek resets, pause/resume handled, autoplay-block notice, "audio unavailable" notice, clickable commentary list that seeks.
 - Lint and build pass. No frontend tests. Browser behavior (progress, sync, seek) has not been re-verified since session 6.
 
-## Tests: 93 passing (`pytest backend/tests -q`)
+## Tests: 95 passing (`pytest backend/tests -q`)
 - `test_jobs.py` JobStore. `test_api.py` upload, job GET, WebSocket, cleanup, videos not served, validators. `test_main.py` orchestration with LLM/TTS faked (file name is historical). `test_vision.py` crop, windows, frame sampling on real tiny videos, prompt/message building, parser, finalize, window failure. `test_audio.py` TTS success/failure/timeout/no leftover files, mutagen on a hand-built mp3, `schedule_quips`, `audio_available`, parser edge cases.
 - Not covered: real LLM or real edge-tts in CI (both need external services), real `motion_box` on moving-subject video, frontend.
 

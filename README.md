@@ -74,13 +74,13 @@ The system prompt is `backend/app/prompts/commentary_system.txt` (restart the ba
 ## Tests
 
 ```powershell
-pytest backend/tests -q          # 93 tests: LLM and edge-tts faked, real tiny videos and a real mp3 for the rest
+pytest backend/tests -q          # 95 tests: LLM and edge-tts faked, real tiny videos and a real mp3 for the rest
 cd frontend; npm run lint; npm run build
 ```
 Not covered by automated tests: the real model, the real TTS service, browser playback sync.
 
 ## Known limitations
-- Single user, in-memory jobs, no auth, one job at a time is recommended (the LLM server is single-slot).
+- Single user, in-memory jobs, no auth, one job at a time (a second upload gets 409; the LLM server is single-slot). Starting the backend deletes leftover files in `uploads/videos` and `uploads/audio`.
 - Processing is slow on local hardware: about 45 s per 10 s of video on a 9B model, so a 10 minute clip takes roughly 45 minutes. One failed window fails the whole job; jobs are lost on restart.
 - Speech needs internet. If edge-tts is unreachable the app shows the commentary as text with a notice.
 - `.avi` and some `.mov` files are accepted by the server but may not play in the browser.
