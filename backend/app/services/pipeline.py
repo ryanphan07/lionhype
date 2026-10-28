@@ -21,6 +21,27 @@ def cleanup_job_files(job_id: str, video_path: str) -> None:
         shutil.rmtree(os.path.join(settings.UPLOAD_DIR, sub, job_id), ignore_errors=True)
 
 
+def sweep_uploads() -> int:
+    """Delete leftover videos and audio from earlier runs. Call at startup, when the in-memory job store is empty."""
+    removed = 0
+    for sub in ("videos", "audio"):
+        folder = os.path.join(settings.UPLOAD_DIR, sub)
+        if not os.path.isdir(folder):
+            continue
+        for entry in os.scandir(folder):
+            try:
+                if entry.is_dir(follow_symlinks=False):
+                    shutil.rmtree(entry.path)
+                else:
+                    os.remove(entry.path)
+                removed += 1
+            except OSError:
+                logger.warning("Could not delete leftover %s", entry.path)
+    if removed:
+        logger.info("Startup sweep removed %d leftover upload entries", removed)
+    return removed
+
+
 async def run_pipeline(job_id: str, video_path: str) -> None:
     async def progress_cb(status: str, progress: int, message: Optional[str] = None) -> None:
         try:
@@ -31,6 +52,10 @@ async def run_pipeline(job_id: str, video_path: str) -> None:
     try:
         result = await process_video_commentary(video_path, job_id=job_id, progress_cb=progress_cb)
         job_store.complete(job_id, result)
+        try:
+            os.remove(video_path)  # the browser plays its own copy; nothing reads the source again
+        except OSError:
+            logger.warning("Could not delete video for job %s", job_id)
     except Exception:
         logger.exception("Commentary generation failed for job %s", job_id)
         try:

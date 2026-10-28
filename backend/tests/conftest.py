@@ -11,3 +11,15 @@ def create_test_video():
 
     # Clean up the dummy video file after tests
     os.remove("test_video.mp4")
+
+
+@pytest.fixture(autouse=True)
+def clean_job_store():
+    """The module-level job_store is shared; unfinished jobs from one test must not block uploads in the next."""
+    from app.services.jobs import job_store
+
+    job_store._jobs.clear()
+    job_store._subscribers.clear()
+    yield
+    job_store._jobs.clear()
+    job_store._subscribers.clear()

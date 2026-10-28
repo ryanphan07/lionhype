@@ -27,9 +27,9 @@ Goal: a credible, honest, demoable resume MVP, shipped fast. Items are tagged wi
 - [ ] Record the demo GIF (20-30 s clip, sound shown via captions or a short linked mp4).
 
 ## Session 9: hygiene (SHOULD-FIX, small)
-- [ ] F4: at startup, delete everything in `uploads/videos` and `uploads/audio` (the in-memory store is empty then). Test with a temp dir.
-- [ ] F5: delete the source video as soon as frames are sampled (end of the analyzing phase) or on completion.
-- [ ] F6: allow one running job at a time; extra uploads get a clear 409/429 message (or queue). Test.
+- [x] F4: at startup, delete everything in `uploads/videos` and `uploads/audio` (the in-memory store is empty then). Test with a temp dir.
+- [x] F5 (video deleted right after a successful job): delete the source video as soon as frames are sampled (end of the analyzing phase) or on completion.
+- [x] F6 (409 "Another clip is still being processed"): allow one running job at a time; extra uploads get a clear 409/429 message (or queue). Test.
 - [ ] F8: pin `requirements.txt` to the installed versions, split `requirements-dev.txt` (pytest), drop `pytest-asyncio`. Verify with a fresh venv and the README quickstart.
 - [ ] F9: delete `docker-compose.yml` and the Dockerfiles, or keep and label "untested, not part of the MVP". Recommendation: delete (ask first).
 - [ ] `npm audit fix` (follow-redirects), `.gitignore` `spike_frames/`, delete `frontend/README.md` boilerplate, remove unused `TTS_PROVIDER`, rename `LLM_MODEL` default to the real model name, make temperature a setting.

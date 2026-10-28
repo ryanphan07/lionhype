@@ -127,6 +127,9 @@ class JobStore:
             except ValueError:
                 pass
 
+    def has_active(self) -> bool:
+        return any(job.status not in TERMINAL for job in self._jobs.values())
+
     def video_paths(self) -> dict[str, str]:
         return {job_id: job.video_path for job_id, job in self._jobs.items()}
 

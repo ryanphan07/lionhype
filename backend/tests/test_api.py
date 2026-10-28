@@ -71,7 +71,7 @@ def test_upload_runs_pipeline_and_completes(client, upload_dir, fake_ai, video_b
     assert job["progress"] == 100
     assert [q["text"] for q in job["result"]["quips"]] == ["first", "second"]
     assert job["result"]["quips"][0]["audio_url"].startswith(f"http://test/{body['job_id']}/")
-    assert os.path.exists(upload_dir / "videos" / f"{body['job_id']}_my_clip_.avi")
+    assert not os.path.exists(upload_dir / "videos" / f"{body['job_id']}_my_clip_.avi")  # source deleted after success
     assert not (upload_dir / "frames").exists()
 
 
@@ -295,3 +295,28 @@ def test_validate_upload_size_limit_is_a_setting(monkeypatch):
     vp.validate_upload_metadata("a.mp4", 1024 * 1024)
     with pytest.raises(ValueError, match="1MB"):
         vp.validate_upload_metadata("a.mp4", 1024 * 1024 + 1)
+
+
+def test_startup_sweep_removes_leftovers(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "UPLOAD_DIR", str(tmp_path))
+    (tmp_path / "videos").mkdir()
+    (tmp_path / "videos" / "old.mp4").write_bytes(b"x")
+    (tmp_path / "audio" / "job1").mkdir(parents=True)
+    (tmp_path / "audio" / "job1" / "a.mp3").write_bytes(b"fake-audio")
+    from app.services.pipeline import sweep_uploads
+    assert sweep_uploads() == 2
+    assert os.listdir(tmp_path / "videos") == [] and os.listdir(tmp_path / "audio") == []
+
+
+def test_second_upload_while_a_job_runs_is_rejected(client, upload_dir, video_bytes):
+    from app.services.jobs import job_store
+    job_store.create(str(upload_dir / "videos" / "busy.avi"), job_id="busy")
+    try:
+        resp = upload(client, video_bytes)
+        assert resp.status_code == 409
+        assert "still being processed" in resp.json()["detail"]
+        assert os.listdir(upload_dir / "videos") == []
+        job_store.fail("busy", "done")
+        assert upload(client, video_bytes).status_code in (200, 400)
+    finally:
+        job_store._jobs.pop("busy", None)

@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.services.jobs import TERMINAL, JobNotFoundError, job_store
-from app.services.pipeline import cleanup_job_files, run_pipeline
+from app.services.pipeline import cleanup_job_files, run_pipeline, sweep_uploads
 from app.services.video_processor import validate_upload_metadata, sanitize_filename, is_video_corrupt, get_video_duration
 
 logging.basicConfig(
@@ -20,6 +20,7 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
 logger = logging.getLogger("lionhype.main")
+BUSY_DETAIL = "Another clip is still being processed. Please wait for it to finish."
 
 
 async def _cleanup_loop() -> None:
@@ -35,6 +36,7 @@ async def _cleanup_loop() -> None:
 
 @contextlib.asynccontextmanager
 async def lifespan(_: FastAPI):
+    await asyncio.to_thread(sweep_uploads)
     task = asyncio.create_task(_cleanup_loop())
     try:
         yield
@@ -68,6 +70,8 @@ async def global_exception_handler(_, exc: Exception):
 
 @app.post("/api/upload")
 async def upload_video(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    if job_store.has_active():
+        raise HTTPException(status_code=409, detail=BUSY_DETAIL)
     if not file.filename:
         raise HTTPException(status_code=400, detail="A filename is required.")
     safe_name = sanitize_filename(file.filename)
@@ -103,6 +107,8 @@ async def upload_video(background_tasks: BackgroundTasks, file: UploadFile = Fil
                 status_code=400,
                 detail=f"Video is too long. Maximum length is {settings.MAX_VIDEO_SECONDS:g} seconds.",
             )
+        if job_store.has_active():  # another upload finished saving first
+            raise HTTPException(status_code=409, detail=BUSY_DETAIL)
         job_store.create(video_path, job_id=job_id)
     except BaseException:
         cleanup_job_files(job_id, video_path)
