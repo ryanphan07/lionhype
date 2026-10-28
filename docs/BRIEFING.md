@@ -37,7 +37,7 @@ LionHype turns a lion dance video into humorous, time-synced AI commentary with 
 **Results session:** "Here are my live-run numbers: <table>. Tune defaults in config, .env.example and the prompt accordingly, and record the measurements in docs/STATE.md and docs/DECISIONS.md."
 
 ## Resume-claim guardrails (only claim what the repo proves)
-Supported: local multimodal LLM pipeline with motion-based cropping and windowed analysis; WebSocket job progress; server-side scheduling so speech never overlaps, using measured clip durations; honest failure handling (no fabricated output); 105 automated tests. Not yet supported: anything about long-clip performance, commentary quality metrics, or live demo robustness until the live session is done.
+Supported: local multimodal LLM pipeline with motion-based cropping and windowed analysis; WebSocket job progress; server-side scheduling so speech never overlaps, using measured clip durations; honest failure handling (no fabricated output); 112 automated tests. Not yet supported: anything about long-clip performance, commentary quality metrics, or live demo robustness until the live session is done.
 
 ## What to share with the planning chat
 Give: `docs/BRIEFING.md` (this file), `docs/OWNER_TODO.md`, `docs/TASKS.md`, `docs/DECISIONS.md`, `docs/HANDOFF.md`. Add `docs/AUDIT.md` only when asking about specific findings (it is long; the top "audit 4" section is enough). Do not share CLAUDE.md, CONVENTIONS.md, STATE.md, README.md or code: the chat does not need them and they go stale; ask Claude Code instead. After each Claude Code session, give the chat the new `docs/HANDOFF.md` (and `docs/BRIEFING.md` if it changed).

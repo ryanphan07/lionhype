@@ -60,7 +60,7 @@ Goal: a credible, honest, demoable resume MVP, shipped fast. Items are tagged wi
 ## Session 10: ship (docs and GIF)
 - [ ] README polish (it is at the repo root; quickstart verified from a fresh venv and a fresh `npm ci` on 2026-10-28; still needs the GIF and a final read): what it is, GIF, architecture diagram, prerequisites (Python 3.12, Node 20+, llama-server + model + mmproj), 5-command quickstart, route list, config table, known limitations (60 s clips, minutes of processing, needs internet for TTS, single user, no auth), honest "how it was tested".
 - [ ] Add a LICENSE (owner picks: MIT is the usual choice for a portfolio repo). Final pass on STATE/TASKS. Tag `v0.1.0`.
-- [ ] Resume bullet draft (only claims the repo proves): local multimodal LLM windowed analysis with motion-based crop, time-synced TTS with server-side overlap scheduling, WebSocket job progress, 105 tests.
+- [ ] Resume bullet draft (only claims the repo proves): local multimodal LLM windowed analysis with motion-based crop, time-synced TTS with server-side overlap scheduling, WebSocket job progress, 112 tests.
 
 ## Polish, only if time remains
 - [x] F14 (partly): audio stops when the video ends. Still open: user volume change while ducked is overwritten; `timeupdate` jitter (up to 250 ms).
