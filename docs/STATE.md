@@ -23,7 +23,7 @@ The browser keeps the file as a blob URL for playback; the server never serves v
 | `services/pipeline.py` | Background runner; failure marks job `error` with a generic message and deletes the job's files | Verified |
 | `services/video_processor.py` | Filename sanitizing, extension/size checks, corruption check, duration, `motion_box` / `compute_crop_box`, `plan_windows`, `sample_window_frames` (same crop for all frames, aspect-preserving resize to `FRAME_WIDTH`) | Verified on synthetic video; crop validated on real footage via the spike |
 | `services/llm.py` | `analyze_window`: system prompt + `image_url` parts, `<think>` and fence stripping, first-JSON-object parse (`raw_decode`), one retry with a JSON nudge, token/time logging. No canned fallback: failures raise | Verified live (one window, Qwen3.5-9B, 44.7 s for 6 frames / 3248 prompt tokens) |
-| `services/commentary.py` | Window loop, `finalize_timeline` (sort, clamp, `MIN_QUIP_GAP_SEC`, word budget, last 14), TTS fan-out, `schedule_quips`, `audio_available` | Verified live; known defects F1-F3 in the audit |
+| `services/commentary.py` | Window loop, `finalize_timeline` (sort, clamp, round to 2 decimals, `MIN_QUIP_GAP_SEC`; text is never cut), TTS fan-out, `schedule_quips`, `audio_available` | Verified live before the F1-F3 fixes; re-verify live |
 | `services/tts.py` | edge-tts with `TTS_VOICE`/`TTS_RATE`, per-clip `TTS_TIMEOUT_SECONDS`; any failure deletes partial files and returns None; durations via mutagen (unreadable duration counts as failure) | Verified live with edge-tts 7.3.1 |
 | `schemas/events.py` | `CommentaryQuip{timestamp,text,audio_url,duration_sec}`, `CommentaryResponse{quips,video_url,audio_available}` | Verified |
 | `prompts/commentary_system.txt` | Owner-written announcer prompt; `MAX_QUIPS` replaced at load; cached per process (restart after editing) | Works with the 9B model; quality on real motion not judged |
@@ -41,7 +41,7 @@ The browser keeps the file as a blob URL for playback; the server never serves v
 - `components/VideoPlayer.jsx`: blob-URL video, quip queue driven by `timeupdate`, one clip at a time, video ducked to 0.3 while a clip plays, stale lines (older than 4 s) skipped, seek resets, pause/resume handled, autoplay-block notice, "audio unavailable" notice, clickable commentary list that seeks.
 - Lint and build pass. No frontend tests. Browser behavior (progress, sync, seek) has not been re-verified since session 6.
 
-## Tests: 92 passing (`pytest backend/tests -q`)
+## Tests: 91 passing (`pytest backend/tests -q`)
 - `test_jobs.py` JobStore. `test_api.py` upload, job GET, WebSocket, cleanup, videos not served, validators. `test_main.py` orchestration with LLM/TTS faked (file name is historical). `test_vision.py` crop, windows, frame sampling on real tiny videos, prompt/message building, parser, finalize, window failure. `test_audio.py` TTS success/failure/timeout/no leftover files, mutagen on a hand-built mp3, `schedule_quips`, `audio_available`, parser edge cases.
 - Not covered: real LLM or real edge-tts in CI (both need external services), real `motion_box` on moving-subject video, frontend.
 
@@ -51,4 +51,4 @@ The browser keeps the file as a blob URL for playback; the server never serves v
 - edge-tts must be >= 7.3.1 (7.2.8 gets 403).
 
 ## Maturity
-Local-first prototype that runs end to end with no fake output. Not hardened: single in-memory job store, no auth, no queue, unpinned dependencies, one unofficial TTS endpoint. Honest and demoable once the timing defects (audit F1-F3) are fixed and the README/GIF exist.
+Local-first prototype that runs end to end with no fake output. Not hardened: single in-memory job store, no auth, no queue, unpinned dependencies, one unofficial TTS endpoint. Honest and demoable once the README/GIF exist and real-footage runs are done (timing defects F1-F3 are fixed in code, not yet re-run live).

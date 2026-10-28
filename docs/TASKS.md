@@ -2,15 +2,15 @@
 
 Goal: a credible, honest, demoable resume MVP, shipped fast. Items are tagged with audit ids (`docs/AUDIT.md`). Do not add features beyond this list without asking.
 
-## Decisions needed from the owner
-1. Clip limit: 60 s (code) or 90 s (goal text)? At 44.7 s per 10 s window on the 9B model, 90 s is about 7 minutes of waiting. Recommendation: keep 60, say "up to 60 s" everywhere, demo with a 20-30 s clip.
-2. Demo model: Qwen3.5-9B (running now) or Qwen3.6-35B-A3B (named in CLAUDE.md)? Pick one, state it in the README, update CLAUDE.md.
-3. TTS risk (F7): accept edge-tts as the only provider and rely on the honest text-only fallback plus a pre-recorded GIF with sound, or approve an offline TTS provider as a new feature (not recommended before the first resume send-out).
+## Decisions (see `docs/DECISIONS.md`)
+1. Clip length: long clips (10+ min) are a goal; limits become settings (session 7b).
+2. Models: develop on the 9B, use the 35B-A3B for real runs.
+3. TTS fallback: owner unsure; keep edge-tts + text-only fallback until v0.1.0, then consider an offline provider (D3).
 
-## Session 7: spoken-line timing (BLOCKS-DEMO, about 1 session)
-- [ ] F1: stop cutting quips mid-sentence. Remove the word truncation in `finalize_timeline` (`commentary.py:35-38`); rely on the prompt limit and `schedule_quips`. Update the tests that assert truncation.
-- [ ] F2: recalibrate with measured speech (8 words = 4.5 s, about 1.8 words/s). Suggested: `MIN_QUIP_GAP_SEC` 4.5, `QUIP_WORDS_PER_SECOND` 1.8 (if still used), `MAX_QUIPS_PER_WINDOW` 3, prompt "at most 10 words" and "at least 4.5 seconds apart". Consider `TTS_RATE=+20%`. Check by ear that +20% is still pleasant.
-- [ ] F3: round timestamps to 2 decimals after shifting (`schedule_quips`), round for display in VideoPlayer.
+## Session 7: spoken-line timing (BLOCKS-DEMO) - DONE in code 2026-10-28, live re-check pending
+- [x] F1: stop cutting quips mid-sentence. Remove the word truncation in `finalize_timeline` (`commentary.py:35-38`); rely on the prompt limit and `schedule_quips`. Update the tests that assert truncation.
+- [x] F2 (gap 4.5, 3 quips per window, 10 words; `QUIP_WORDS_PER_SECOND` removed; `TTS_RATE` left at +10%, try +20% by ear): recalibrate with measured speech (8 words = 4.5 s, about 1.8 words/s). Suggested: `MIN_QUIP_GAP_SEC` 4.5, `QUIP_WORDS_PER_SECOND` 1.8 (if still used), `MAX_QUIPS_PER_WINDOW` 3, prompt "at most 10 words" and "at least 4.5 seconds apart". Consider `TTS_RATE=+20%`. Check by ear that +20% is still pleasant.
+- [x] F3: round timestamps to 2 decimals after shifting (`schedule_quips`), round for display in VideoPlayer.
 - [ ] Restart uvicorn (running process predates session 6 and the edge-tts upgrade).
 
 ## Session 8: real footage, in the browser (BLOCKS-DEMO)

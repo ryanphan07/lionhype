@@ -16,7 +16,7 @@ Goal: a credible, honest, demoable MVP for a resume (upload a clip of 90s or les
 
 ## Commands
 (If any of these is wrong, fix this section.)
-Run from the repo root in PowerShell unless noted. Tests (92) verified 2026-10-28; lint and build verified 2026-10-28, `uvicorn` last verified 2026-10-27. edge-tts must be >= 7.3.1 (re-run `pip install -r requirements.txt` after pulling).
+Run from the repo root in PowerShell unless noted. Tests (91) verified 2026-10-28; lint and build verified 2026-10-28, `uvicorn` last verified 2026-10-27. edge-tts must be >= 7.3.1 (re-run `pip install -r requirements.txt` after pulling).
 - Backend setup (once): `cd backend; python -m venv venv; venv\Scripts\Activate.ps1; pip install -r requirements.txt` .
 - Backend tests: `pytest backend/tests -q` (works from the repo root or from `backend/`).
 - Backend run: `cd backend; uvicorn app.main:app --port 8000`. `backend/.env` is resolved relative to `config.py`, so the working directory does not matter for `.env`. `CORS_ORIGINS` (JSON list) is configurable there.
@@ -66,8 +66,8 @@ idle -> uploading -> extracting -> analyzing -> synthesizing -> completed
 - Run backend tests and frontend lint/build before every commit. One logical change per commit.
 
 ## Timing
-- Spoken-line scheduling is server-side (`commentary.schedule_quips`). Measured TTS speed: about 1.8 words per second including padding (8 words = 4.5 s). Keep `MIN_QUIP_GAP_SEC`, the prompt's spacing rule and `QUIP_WORDS_PER_SECOND` consistent with that.
-- Quip timestamps in results should be rounded to 2 decimals (not yet true after a shift: TASKS session 7).
+- Spoken-line scheduling is server-side (`commentary.schedule_quips`). Measured TTS speed: about 1.8 words per second including padding (8 words = 4.5 s). Keep `MIN_QUIP_GAP_SEC` (4.5) and the prompt's spacing and length rules (4.5 s apart, 10 words) consistent with that. Quip text is never truncated.
+- Quip timestamps in results are rounded to 2 decimals.
 
 ## Library / API Pins
 - **react-toastify**: use string literals for position, e.g. `toast.error(msg, { position: "top-right" })`. Do NOT use `toast.POSITION.TOP_RIGHT` (deprecated).
