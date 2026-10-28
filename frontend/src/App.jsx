@@ -1,15 +1,18 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import VideoPlayer from './components/VideoPlayer';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
+const WS_BASE = API_BASE.replace(/^http/, 'ws');
 
 function App() {
   const [commentaryQuips, setCommentaryQuips] = useState([]);
   const [videoUrl, setVideoUrl] = useState(null);
   const [processingStatus, setProcessingStatus] = useState('idle');
   const [progress, setProgress] = useState(0);
-  const [errorMessage, setErrorMessage] = useState('');
+  const [, setErrorMessage] = useState('');
   const [pipelineStage, setPipelineStage] = useState('');
   const socketRef = useRef(null);
 
@@ -26,7 +29,7 @@ function App() {
       socketRef.current.close();
     }
 
-    const socket = new WebSocket('ws://backend:8000/ws/analyze');
+    const socket = new WebSocket(`${WS_BASE}/ws/analyze`);
     socketRef.current = socket;
 
     socket.onopen = () => {
@@ -96,7 +99,7 @@ function App() {
     formData.append('file', file);
 
     try {
-      const response = await axios.post('http://backend:8000/api/upload', formData, {
+      const response = await axios.post(`${API_BASE}/api/upload`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
