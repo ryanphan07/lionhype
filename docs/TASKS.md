@@ -1,4 +1,4 @@
-# LionHype tasks (2026-10-28)
+# LionHype tasks (2026-10-28, after audit 3)
 
 Goal: a credible, honest, demoable resume MVP, shipped fast. Items are tagged with audit ids (`docs/AUDIT.md`). Do not add features beyond this list without asking.
 
@@ -6,6 +6,18 @@ Goal: a credible, honest, demoable resume MVP, shipped fast. Items are tagged wi
 1. Clip length: long clips (10+ min) are a goal; limits become settings (session 7b).
 2. Models: develop on the 9B, use the 35B-A3B for real runs.
 3. TTS fallback: owner unsure; keep edge-tts + text-only fallback until v0.1.0, then consider an offline provider (D3).
+
+## Session 11: robustness before long clips (SHOULD-FIX, all small, do next)
+- [ ] N2: `AsyncOpenAI(max_retries=0)` so a window fails when its own timeout fires; test that a transport error is raised once.
+- [ ] N5: make `test_second_upload_while_a_job_runs_is_rejected` use `fake_ai` (no network); suite should drop back to about 3 s.
+- [ ] N6: let `has_active()` ignore jobs idle longer than a stale limit (e.g. `JOB_STALE_SECONDS`, default 2x `LLM_TIMEOUT`), marking them failed; test with a fake clock.
+- [ ] N4: map failures to safe messages ("The AI model is not reachable", "The model returned unusable output", "The video could not be processed"); log the detail server-side; test each category.
+- [ ] N1: frontend: when the WebSocket is lost, fall back to polling `GET /api/jobs/{id}` every 5 s until terminal (no 5-try limit); keep `job_id` in sessionStorage so a refresh can resume status (the video blob needs re-selecting; show that).
+- [ ] N10: clamp shifted timestamps to the video duration; delete the mp3 of a dropped quip.
+- [ ] N7 (optional, prompt-level): pass the last 2-3 `seen` summaries to the next window to reduce repetition on long clips.
+
+## Decision before long-clip testing: D4 (see DECISIONS.md)
+- [ ] Owner: pick the long-job strategy (A keep all-or-nothing, B skip failed windows, C progressive results). Recommendation: B now (small), C after v0.1.0.
 
 ## Session 7: spoken-line timing (BLOCKS-DEMO) - DONE in code 2026-10-28, live re-check pending
 - [x] F1: stop cutting quips mid-sentence. Remove the word truncation in `finalize_timeline` (`commentary.py:35-38`); rely on the prompt limit and `schedule_quips`. Update the tests that assert truncation.
@@ -17,7 +29,7 @@ Goal: a credible, honest, demoable resume MVP, shipped fast. Items are tagged wi
 - [x] `MAX_VIDEO_SECONDS` 1800 and `MAX_UPLOAD_MB` 2048 as settings, tested.
 - [x] ETA in the analyzing message ("part i of n, about m min left") from the running average window time (`commentary.analyzing_message`).
 - [ ] Decide failure policy for one bad window in a long job: retry the window, or skip it with a logged gap, instead of failing after 40 minutes (changes the "fail loud" rule: ask first).
-- [ ] Run one 10+ minute clip on the 9B model and record windows, total time, memory, and whether the WebSocket, blob playback and TTS count (about 100+ clips) hold up. Repeat on the 35B-A3B.
+- [ ] After session 11 and D4: run one 10+ minute clip on the 9B model and record windows, total time, memory, and whether the WebSocket, blob playback and TTS count (about 100+ clips) hold up. Repeat on the 35B-A3B.
 - [ ] Consider reading upload in chunks with early size rejection; large bodies are currently spooled to disk by Starlette before the check.
 
 ## Session 8: real footage, in the browser (BLOCKS-DEMO)
@@ -39,13 +51,17 @@ Goal: a credible, honest, demoable resume MVP, shipped fast. Items are tagged wi
 ## Session 10: ship (docs and GIF)
 - [ ] README at the repo root (moved to the root 2026-10-28; links still to verify): what it is, GIF, architecture diagram, prerequisites (Python 3.12, Node 20+, llama-server + model + mmproj), 5-command quickstart, route list, config table, known limitations (60 s clips, minutes of processing, needs internet for TTS, single user, no auth), honest "how it was tested".
 - [ ] Add a LICENSE (owner picks: MIT is the usual choice for a portfolio repo). Final pass on STATE/TASKS. Tag `v0.1.0`.
-- [ ] Resume bullet draft (only claims the repo proves): local multimodal LLM windowed analysis with motion-based crop, time-synced TTS with server-side overlap scheduling, WebSocket job progress, 92+ tests.
+- [ ] Resume bullet draft (only claims the repo proves): local multimodal LLM windowed analysis with motion-based crop, time-synced TTS with server-side overlap scheduling, WebSocket job progress, 95+ tests.
 
 ## Polish, only if time remains
 - [x] F14 (partly): audio stops when the video ends. Still open: user volume change while ducked is overwritten; `timeupdate` jitter (up to 250 ms).
 - [ ] F13: warn in the UI when the browser cannot play the uploaded format, or restrict to `.mp4`/`.mov`.
 - [x] F15 (partly): renamed `test_commentary.py`, removed the unused `conftest.py` fixture. Still open: moving-subject fixture for `motion_box`, 2-3 Vitest tests for the VideoPlayer queue.
 - [ ] Show dropped-quip text as "(skipped, overlapped)" instead of silently removing it (changes result shape: ask first).
+
+## Throughput experiments for long clips (N8, measure before choosing)
+- [ ] On one 60 s clip, record seconds per window for: baseline; `FRAME_WIDTH` 640; `FRAMES_PER_WINDOW` 4; `WINDOW_SECONDS` 20; each on the 9B and the 35B-A3B. Pick defaults for the 35B from the numbers.
+- [ ] Optional: `llama-server -np 2` with two windows in flight (drops the previous-quips dependency; needs a quality check).
 
 ## Out of scope (do not start)
 Auth, persistence/database, multi-user queue, S3/presigned uploads, Docker, deployment, offline TTS provider, MCP server, timeline analytics dashboard.

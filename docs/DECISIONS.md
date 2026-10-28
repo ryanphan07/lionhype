@@ -23,3 +23,10 @@ Owner decisions and the reasoning behind them. Add new entries at the bottom wit
   3. Windows built-in SAPI via pyttsx3: trivial, but robotic and weak for a comedy demo.
 - Recommendation: do option 1 now, finish and ship the MVP, record the demo GIF with sound while edge-tts works, then add option 2 as the first post-MVP task. Revisit if edge-tts breaks again. Nothing here changes the job API: `audio_url` stays nullable.
 - Status: decision deferred until after v0.1.0.
+
+### D4. Long-job strategy (open: owner to choose; audit 3 N3)
+A 10+ minute clip is one job of about 60 windows. Today one failed window fails everything and nothing is shown until the end.
+- A. Keep all-or-nothing (current). Simple and honest, but a late failure wastes up to 45 minutes.
+- B. Skip a failed window after one retry, log it, and tell the user which time ranges have no commentary ("skipped 2 of 60 parts"). Small change; still honest because the gap is reported, not faked. Changes the earlier "a failed window ends the job" rule.
+- C. Progressive results: synthesize each window as it finishes and let the UI show and play commentary while the rest processes. Best UX for long clips; changes the job result API (partial results) and the player. Larger change.
+- Recommendation: B now, C after v0.1.0.

@@ -1,29 +1,29 @@
-# Handoff: sessions 7, 7b, 9 (+ decisions)
+# Handoff: audit 3 (2026-10-28)
 
 ## 1. Done
-- docs/DECISIONS.md (new): D1 long clips (10+ min) are a goal, D2 9B for dev / 35B-A3B for real runs, D3 TTS fallback (deferred; recommendation: edge-tts + text-only until v0.1.0, then offline Piper).
-- commentary.py/config/prompt: no more quip truncation, `MIN_QUIP_GAP_SEC` 4.5, 3 quips/window, 10 words, timestamps rounded; `QUIP_WORDS_PER_SECOND` removed. `analyzing_message` adds a time-left estimate.
-- config/video_processor: `MAX_VIDEO_SECONDS` 1800, `MAX_UPLOAD_MB` 2048 (settings).
-- pipeline/main/jobs: startup sweep of uploads, source video deleted after success, 409 when a job is running.
-- requirements.txt pinned + `websockets` added (fresh installs had no WS library: /ws returned 404); requirements-dev.txt; npm audit fix; LLM_TEMPERATURE; removed TTS_PROVIDER; spike script uses shared motion_box; VideoPlayer stops audio on `ended`; test_main.py renamed test_commentary.py. Docs updated after each change.
+- docs/AUDIT.md: new audit 3 on top (baseline, goal check, findings N1-N11, verified-good list, plan); audits 1-2 kept as history.
+- docs/TASKS.md: new session 11 (robustness before long clips), D4 decision item, throughput experiments, reordered pointers.
+- docs/DECISIONS.md: D4 (long-job strategy: A all-or-nothing, B skip failed windows, C progressive results; recommends B then C).
+- docs/STATE.md, README.md: long-clip gaps note, DECISIONS link. No source code changed.
 
 ## 2. Decisions and deviations
-- Docker files not deleted (needs your OK). frontend/README.md (Vite boilerplate) deleted.
-- LICENSE not added (your choice). Per-window failure policy for long jobs left open (changes "fail loud").
-- You moved README to the repo root; I edited it there.
+- Audit only: found bugs are listed, not fixed. CLAUDE.md not edited (still says 90 s and the 35B only).
+- No live run: llama-server, uvicorn and Vite were stopped.
 
 ## 3. Results
-- pytest backend/tests -q: 95 passed. npm run lint clean, build ok, npm audit 0 vulnerabilities.
+- pytest backend/tests -q: 95 passed (10.5 s). npm run lint clean, build ok, npm audit 0.
 
 ## 4. Not verified, needs manual testing
-1. Live re-check of F1-F3: llama-server was down. Restart uvicorn (new code, websockets) and run a clip in the browser.
-2. A 10+ minute clip on 9B, then 35B (time, memory, ~100 TTS clips, ETA text).
-3. Fresh-venv install from requirements.txt and the README quickstart.
+1. Live re-check of the F1-F3 timing fixes and browser playback (progress, sync, seek, pause, error paths).
+2. Fresh-venv install from requirements.txt.
+3. A 10+ minute clip on 9B and 35B.
 
 ## 5. Open issues and risks
-- commentary.py window loop: one failed window fails a possibly 40-minute job; jobs are lost on restart.
-- VideoPlayer.jsx: volume-ducking overwrite, 250 ms timeupdate jitter.
-- docker-compose.yml, Dockerfiles stale. Upload body is spooled before the size check (main.py).
+- llm.py:18-22 SDK max_retries=2: a hung window can take 15 min to fail.
+- App.jsx:104-115 gives up after about 25 s of WS loss, no polling fallback.
+- commentary.py:83-135 all-or-nothing job (D4).
+- jobs.py has_active can wedge uploads with 409.
+- test_api.py last test uses the real network (7.7 s).
 
 ## 6. Suggested next session
-Session 8 in TASKS.md: real clips in the browser, tune prompt/TTS_RATE (try +20%), record the GIF; then LICENSE and tag v0.1.0.
+Session 11 in TASKS.md (N2, N5, N6, N4, N1, N10), decide D4, then session 8 on real footage.

@@ -52,5 +52,8 @@ The browser keeps the file as a blob URL for playback; the server never serves v
 - llama-server at 127.0.0.1:8080 with `--mmproj`. In use now: Qwen3.5-9B Q4_K_M; CLAUDE.md names Qwen3.6-35B-A3B. Decide which one is the demo model.
 - edge-tts must be >= 7.3.1 (7.2.8 gets 403).
 
+## Known gaps for long clips (audit 3)
+The pipeline handles long clips by limits only. Not yet robust: SDK retries (up to 15 min to fail a window), no polling fallback when the WebSocket drops, all-or-nothing results, a one-job lock that can wedge, generic error text. See TASKS session 11 and DECISIONS D4.
+
 ## Maturity
 Local-first prototype that runs end to end with no fake output. Not hardened: single in-memory job store, no auth, no queue, unpinned dependencies, one unofficial TTS endpoint. Honest and demoable once the README/GIF exist and real-footage runs are done (timing defects F1-F3 are fixed in code, not yet re-run live).
