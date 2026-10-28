@@ -1,5 +1,4 @@
 # Handoff: audit session (2026-10-28)
-
 ## 1. Done
 - docs/AUDIT.md: replaced with audit 2 (baseline, goal check, live run, findings F1-F17, status of every old finding).
 - docs/STATE.md, docs/TASKS.md, docs/README.md: rewritten to match the code (old ones described removed code and a stale frontend/API).
