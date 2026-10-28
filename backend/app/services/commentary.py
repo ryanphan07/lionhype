@@ -14,6 +14,7 @@ logger = logging.getLogger("lionhype.commentary")
 
 LAST_QUIP_MAX_WORDS = 14
 MIN_QUIP_WORDS = 3
+AUDIO_GAP_SEC = 0.3
 
 
 def finalize_timeline(quips: List[Dict[str, Any]], duration: float) -> List[Dict[str, Any]]:
@@ -37,6 +38,27 @@ def finalize_timeline(quips: List[Dict[str, Any]], duration: float) -> List[Dict
         text = " ".join(quip["text"].split()[:max_words])
         if text:
             result.append({"timestamp": quip["timestamp"], "text": text})
+    return result
+
+
+def schedule_quips(quips: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Keep spoken quips from overlapping: shift late by up to MAX_SHIFT_SEC, else drop. Quips without audio never block."""
+    result: List[Dict[str, Any]] = []
+    audio_end: Optional[float] = None
+    for quip in sorted(quips, key=lambda q: q["timestamp"]):
+        quip = dict(quip)
+        if quip.get("audio_url") and quip.get("duration_sec"):
+            start = quip["timestamp"]
+            if audio_end is not None and start < audio_end + AUDIO_GAP_SEC:
+                new_start = audio_end + AUDIO_GAP_SEC
+                shift = new_start - start
+                if shift > settings.MAX_SHIFT_SEC:
+                    logger.warning("Dropping quip at t=%.2f: would need a %.2fs shift (max %.2fs)", start, shift, settings.MAX_SHIFT_SEC)
+                    continue
+                logger.info("Shifting quip from t=%.2f to t=%.2f to avoid audio overlap", start, new_start)
+                quip["timestamp"] = start = new_start
+            audio_end = start + quip["duration_sec"]
+        result.append(quip)
     return result
 
 
@@ -88,40 +110,32 @@ async def process_video_commentary(
     logger.info("Timeline: %d quips from %d windows", len(normalized_quips), total_windows)
 
     await _report("synthesizing", 70)
-    semaphore = asyncio.Semaphore(4)
-    
-    async def _safe_generate_audio(quip: Dict[str, Any]) -> Dict[str, Any]:
+    semaphore = asyncio.Semaphore(settings.TTS_CONCURRENCY)
+
+    async def _safe_generate_audio(quip: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         async with semaphore:
-            return await tts_service.generate_audio_clip(quip, video_id=video_id)
+            try:
+                return await tts_service.generate_audio_clip(quip, video_id=video_id)
+            except Exception as e:
+                logger.warning("TTS failed for t=%.2f: %s", quip["timestamp"], e)
+                return None
 
-    audio_tasks = [_safe_generate_audio(quip) for quip in normalized_quips]
-    synthesized_audio = await asyncio.gather(*audio_tasks, return_exceptions=True)
-    
-    total = len(normalized_quips)
-    done = 0
-    quips: List[CommentaryQuip] = []
-    all_failed = True
-    
-    for index, quip in enumerate(normalized_quips):
-        result = synthesized_audio[index]
-        done += 1
-        await _report("synthesizing", 70 + int(25 * done / total))
-        
-        if isinstance(result, Exception):
-            logger.warning("TTS failed for quip index %d: %s", index, result)
-            audio_url = None
-        else:
-            audio_url = result.get("audio_url")
-            
-        if audio_url is not None:
-            all_failed = False
-            
-        quip_payload = dict(quip)
-        quip_payload["audio_url"] = audio_url
-        quips.append(CommentaryQuip(**quip_payload))
+    results = await asyncio.gather(*(_safe_generate_audio(q) for q in normalized_quips))
+    await _report("synthesizing", 90)
 
-    if all_failed:
-        logger.error("All TTS clips failed for video_id: %s", video_id)
+    with_audio: List[Dict[str, Any]] = []
+    for quip, result in zip(normalized_quips, results):
+        payload = dict(quip)
+        payload["audio_url"] = result.get("audio_url") if result else None
+        payload["duration_sec"] = result.get("duration_sec") if result and payload["audio_url"] else None
+        with_audio.append(payload)
+
+    scheduled = schedule_quips(with_audio)
+    audio_available = any(q["audio_url"] for q in scheduled)
+    if not audio_available:
+        logger.error("No audio clips available for video_id: %s", video_id)
 
     logger.info("Pipeline for %s finished in %.1fs", video_id, time.monotonic() - started)
-    return CommentaryResponse(quips=quips)
+    return CommentaryResponse(
+        quips=[CommentaryQuip(**q) for q in scheduled], audio_available=audio_available
+    )

@@ -56,11 +56,11 @@ The code is intentionally resilient in CI and offline environments.
 `backend/app/services/tts.py` adds audio clip generation.
 
 Features in place:
-- Per-quip audio generation based on timestamp and text
-- Output path in the backend upload/audio folder
-- URL generation for playback from the app server
-- Fallback behavior if TTS dependency is missing
-- Observability logging for retry wrappers and fallback behavior
+- Per-quip edge-tts synthesis (`TTS_VOICE`, `TTS_RATE`, per-clip `TTS_TIMEOUT_SECONDS`, concurrency `TTS_CONCURRENCY`), untested against live edge-tts
+- Any failure (exception, timeout, empty/tiny file, unreadable duration) logs a warning, deletes partial files and returns None, so `audio_url` is null. No fake audio is ever written.
+- mp3 duration measured with mutagen and stored as `duration_sec`
+- `commentary.schedule_quips`: audio quips never start before the previous audio ends + 0.3s; shifted up to `MAX_SHIFT_SEC`, else dropped; no-audio quips are kept and never block
+- Result carries `audio_available`; with no audio the job message is "Commentary ready (audio unavailable)" and the UI shows a notice
 
 #### FastAPI app, job API and websocket flow
 `backend/app/main.py` (routes), `backend/app/services/jobs.py` (in-memory `JobStore`) and `backend/app/services/pipeline.py` (background runner). Unverified against real footage and the real LLM/TTS; covered by route tests with the LLM and TTS mocked.
@@ -109,7 +109,7 @@ Features in place:
 - Includes audio controls for the synthesized clips
 
 ### Testing
-32 backend tests, all passing. LLM and TTS are mocked; everything else is real.
+92 backend tests, all passing. LLM and edge-tts are faked; `tests/test_audio.py` covers TTS paths, mutagen duration on a hand-built mp3, scheduling, audio_available and the JSON parser.
 - `tests/test_jobs.py`: JobStore behavior
 - `tests/test_main.py`: frame extraction, commentary orchestration, progress callback, TTS failure handling
 - `tests/test_api.py`: upload, GET job, WebSocket (replay, 4404, live progress, idle disconnect), pipeline failure cleanup, videos not served

@@ -10,12 +10,12 @@ Goal: a credible, honest, demoable MVP for a resume (upload a clip of 90s or les
 - LLM: llama-server (OpenAI-compatible) at `http://127.0.0.1:8080/v1`, multimodal via `--mmproj`. Configure via `backend/.env` (see `backend/.env.example` for LLM_*, WINDOW_SECONDS, FRAMES_PER_WINDOW, FRAME_WIDTH, MAX_QUIPS_PER_WINDOW, MAX_VIDEO_SECONDS).
 - Start it with: `llama-server -m <gguf> --mmproj <mmproj-F16.gguf> -c 32768 -np 1 -ngl 99 --port 8080 --jinja`
 - The system prompt lives in `backend/app/prompts/commentary_system.txt` (owner-written; `MAX_QUIPS` is replaced by MAX_QUIPS_PER_WINDOW at load). The LLM step never falls back to canned text: a failed window ends the job in `error`.
-- TTS: edge-tts (needs internet).
+- TTS: edge-tts (needs internet). Failures yield no audio (`audio_url` null), never placeholder files. Settings: TTS_VOICE, TTS_RATE, TTS_TIMEOUT_SECONDS, MAX_SHIFT_SEC.
 - All settings come from the single shared `settings` object in `backend/app/config.py`. No hardcoded URLs or paths elsewhere.
 
 ## Commands
 (If any of these is wrong, fix this section.)
-Run from the repo root in PowerShell unless noted. Tests (70) verified 2026-10-28; lint, build and `uvicorn` last verified 2026-10-27.
+Run from the repo root in PowerShell unless noted. Tests (92) verified 2026-10-28; lint, build and `uvicorn` last verified 2026-10-27.
 - Backend setup (once): `cd backend; python -m venv venv; venv\Scripts\Activate.ps1; pip install -r requirements.txt` .
 - Backend tests: `pytest backend/tests -q` (works from the repo root or from `backend/`).
 - Backend run: `cd backend; uvicorn app.main:app --port 8000`. `backend/.env` is resolved relative to `config.py`, so the working directory does not matter for `.env`. `CORS_ORIGINS` (JSON list) is configurable there.

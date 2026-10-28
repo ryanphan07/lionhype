@@ -26,6 +26,7 @@ const errorDetail = (error, fallback) => {
 
 function App() {
   const [commentaryQuips, setCommentaryQuips] = useState([]);
+  const [audioAvailable, setAudioAvailable] = useState(true);
   const [videoUrl, setVideoUrl] = useState(null);
   const [processingStatus, setProcessingStatus] = useState('idle');
   const [progress, setProgress] = useState(0);
@@ -64,6 +65,7 @@ function App() {
       const { data } = await axios.get(`${API_BASE}/api/jobs/${jobId}`);
       if (jobIdRef.current !== jobId) return;
       setCommentaryQuips(Array.isArray(data.result?.quips) ? data.result.quips : []);
+      setAudioAvailable(data.result?.audio_available !== false);
       setProcessingStatus('completed');
       setProgress(100);
     } catch (error) {
@@ -135,6 +137,7 @@ function App() {
     terminalRef.current = false;
     attemptsRef.current = 0;
     setCommentaryQuips([]);
+    setAudioAvailable(true);
     setErrorMessage('');
     setStatusMessage('');
     setProgress(0);
@@ -209,6 +212,7 @@ function App() {
               key={videoUrl}
               videoUrl={videoUrl}
               commentaryQuips={commentaryQuips}
+              audioAvailable={audioAvailable}
               processingStatus={processingStatus}
             />
           </div>

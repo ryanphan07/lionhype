@@ -98,7 +98,8 @@ class JobStore:
         job = self.get(job_id)
         if job.status not in TERMINAL:
             job.result = result
-            self.update(job_id, "completed", 100, "Commentary ready")
+            message = "Commentary ready" if result.audio_available else "Commentary ready (audio unavailable)"
+            self.update(job_id, "completed", 100, message)
 
     def fail(self, job_id: str, message: str):
         if not message:

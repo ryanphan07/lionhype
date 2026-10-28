@@ -5,6 +5,7 @@ pydantic-settings
 opencv-python
 httpx
 edge-tts>=7.3.1
+mutagen
 openai
 python-multipart
 numpy

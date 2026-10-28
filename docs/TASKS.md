@@ -12,7 +12,7 @@ Missing or incomplete areas include:
 The current code anticipates external AI services but also includes offline fallbacks.
 
 This means:
-- TTS output is generated locally as a fallback pattern, but real production deployment still needs a finalized choice of model/provider and audio storage strategy
+- edge-tts has not been run against the real service from this code; verify one real clip end to end
 
 ### 3. End-to-end real-world validation
 The project is tested with mock objects, but it is not yet proven against:

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 const STALE_SECONDS = 4;
 const DUCKED_VOLUME = 0.3;
 
-const VideoPlayer = ({ videoUrl, commentaryQuips, processingStatus }) => {
+const VideoPlayer = ({ videoUrl, commentaryQuips, processingStatus, audioAvailable = true }) => {
   const videoRef = useRef(null);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [audioBlocked, setAudioBlocked] = useState(false);
@@ -121,6 +121,12 @@ const VideoPlayer = ({ videoUrl, commentaryQuips, processingStatus }) => {
       {audioBlocked && (
         <p role="status" style={{ color: '#8a6d00' }}>
           The browser blocked commentary audio. Press play on the video to enable it.
+        </p>
+      )}
+
+      {isCompleted && !audioAvailable && (
+        <p role="status" style={{ color: '#8a6d00' }}>
+          Audio is unavailable for this clip. Commentary is shown as text only.
         </p>
       )}
 

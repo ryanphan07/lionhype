@@ -25,10 +25,12 @@ class Settings(BaseSettings):
     QUIP_WORDS_PER_SECOND: float = 2.5
 
     TTS_PROVIDER: str = "edge_tts"
-    TTS_VOICE: str = "en-US-AnaNeural"
+    TTS_VOICE: str = "en-US-GuyNeural"
+    TTS_RATE: str = "+10%"
     TTS_ENABLED: bool = True
-    TTS_TIMEOUT: float = 10.0
-    TTS_MAX_RETRIES: int = 2
+    TTS_TIMEOUT_SECONDS: float = 30.0
+    TTS_CONCURRENCY: int = 4
+    MAX_SHIFT_SEC: float = 2.0
 
     LOG_LEVEL: str = "INFO"
 

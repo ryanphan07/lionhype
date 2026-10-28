@@ -64,7 +64,7 @@ async def test_progress_clamping_and_monotonicity(store):
 @pytest.mark.anyio
 async def test_terminal_jobs_ignore_updates_and_publish_nothing(store):
     job = store.create("video.mp4")
-    store.complete(job.job_id, CommentaryResponse.model_construct(quips=[]))
+    store.complete(job.job_id, CommentaryResponse.model_construct(quips=[], audio_available=True))
     assert job.status == "completed"
     
     # Try to update terminal job
@@ -108,7 +108,7 @@ async def test_unsubscribe_is_idempotent(store):
 @pytest.mark.anyio
 async def test_purge_expired_removes_only_expired_terminal_jobs(store):
     job1 = store.create("video1.mp4")
-    store.complete(job1.job_id, CommentaryResponse.model_construct(quips=[]))
+    store.complete(job1.job_id, CommentaryResponse.model_construct(quips=[], audio_available=True))
     job1.updated_at = time.time() - 7200  # 2 hours ago
     
     # Add job2 directly to _jobs to avoid triggering purge_expired inside create()
@@ -118,7 +118,7 @@ async def test_purge_expired_removes_only_expired_terminal_jobs(store):
         status="completed", 
         progress=100, 
         message="Commentary ready", 
-        result=CommentaryResponse.model_construct(quips=[]), 
+        result=CommentaryResponse.model_construct(quips=[], audio_available=True), 
         created_at=time.time(), 
         updated_at=time.time()
     )
@@ -145,7 +145,7 @@ async def test_fail_sets_error_status_and_message(store):
 @pytest.mark.anyio
 async def test_complete_stores_result(store):
     job = store.create("video.mp4")
-    result = CommentaryResponse.model_construct(quips=[])
+    result = CommentaryResponse.model_construct(quips=[], audio_available=True)
     store.complete(job.job_id, result)
     assert job.status == "completed"
     assert job.result is result
