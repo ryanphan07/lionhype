@@ -78,4 +78,4 @@ idle -> uploading -> extracting -> analyzing -> synthesizing -> completed
 - Backend settings/schemas: `backend/app/config.py`, `backend/app/schemas/`
 - Backend tests: `backend/tests/`; dev scripts: `backend/scripts/`
 - Frontend app/state: `frontend/src/App.jsx`; components: `frontend/src/components/`
-- Docs: `README.md`, `STATE.md`, `TASKS.md`, `docs/AUDIT.md`
+- Docs: root `README.md`; in `docs/`: `STATE.md`, `TASKS.md`, `AUDIT.md`, `DECISIONS.md`, `OWNER_TODO.md`, `BRIEFING.md` (summary for the owner's planning chat: refresh it at the end of any session that changes state, decisions or roadmap), `HANDOFF.md`

@@ -1,5 +1,7 @@
 # LionHype tasks (2026-10-28, after audit 4)
 
+Owner-only items (decisions, live run, ship steps) are in `docs/OWNER_TODO.md`; the planning chat reads `docs/BRIEFING.md`.
+
 Goal: a credible, honest, demoable resume MVP, shipped fast. Items are tagged with audit ids (`docs/AUDIT.md`). Do not add features beyond this list without asking.
 
 ## Decisions (see `docs/DECISIONS.md`)

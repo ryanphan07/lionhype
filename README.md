@@ -92,4 +92,4 @@ Not covered by automated tests: the real model, the real TTS service, browser pl
 - Docker files in the repo are stale and untested; the app is run natively.
 
 ## More
-- `docs/DECISIONS.md` design decisions, `docs/STATE.md` what is implemented, `docs/TASKS.md` what is next, `docs/AUDIT.md` latest audit, `docs/CONVENTIONS.md` contracts and rules.
+- `docs/BRIEFING.md` project summary for planning, `docs/OWNER_TODO.md` owner checklist, `docs/DECISIONS.md` design decisions, `docs/STATE.md` what is implemented, `docs/TASKS.md` what is next, `docs/AUDIT.md` latest audit, `docs/CONVENTIONS.md` contracts and rules.
