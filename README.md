@@ -45,7 +45,7 @@ uvicorn app.main:app --port 8000
 # 3. Frontend (another terminal)
 cd frontend; npm install; npm run dev     # http://localhost:5173
 ```
-Open http://localhost:5173, choose a clip (`.mp4`, `.mov`, `.avi`; at most 60 s and 100 MB), wait for the progress bar, press play. Expect minutes of processing: a 10 s window took about 45 s on a 9B model (measured).
+Open http://localhost:5173, choose a clip (`.mp4`, `.mov`, `.avi`; at most 30 min and 2 GB by default, see `MAX_VIDEO_SECONDS`/`MAX_UPLOAD_MB`), wait for the progress bar, press play. Expect minutes of processing: a 10 s window took about 45 s on a 9B model (measured).
 
 ## API
 
@@ -65,7 +65,7 @@ Open http://localhost:5173, choose a clip (`.mp4`, `.mov`, `.avi`; at most 60 s 
 | `MAX_QUIPS_PER_WINDOW`, `MIN_QUIP_GAP_SEC` | 3, 4.5 | Quip budget (4.5 s is about the speech time of an 8-word line) |
 | `TTS_VOICE`, `TTS_RATE`, `TTS_TIMEOUT_SECONDS`, `TTS_CONCURRENCY`, `TTS_ENABLED` | en-US-GuyNeural, +10%, 30, 4, true | Speech |
 | `MAX_SHIFT_SEC` | 2.0 | Largest delay allowed to avoid audio overlap |
-| `MAX_VIDEO_SECONDS` | 60 | Upload length limit |
+| `MAX_VIDEO_SECONDS`, `MAX_UPLOAD_MB` | 1800, 2048 | Upload limits (guards, not speed promises) |
 | `JOB_TTL_SECONDS`, `CLEANUP_INTERVAL_SECONDS` | 3600, 600 | Job and file expiry |
 | `CORS_ORIGINS`, `PUBLIC_BASE_URL`, `LOG_LEVEL` | localhost:5173/3000, http://localhost:8000, INFO | Server |
 
@@ -81,7 +81,7 @@ Not covered by automated tests: the real model, the real TTS service, browser pl
 
 ## Known limitations
 - Single user, in-memory jobs, no auth, one job at a time is recommended (the LLM server is single-slot).
-- Clips are limited to 60 s; processing is slow on local hardware.
+- Processing is slow on local hardware: about 45 s per 10 s of video on a 9B model, so a 10 minute clip takes roughly 45 minutes. One failed window fails the whole job; jobs are lost on restart.
 - Speech needs internet. If edge-tts is unreachable the app shows the commentary as text with a notice.
 - `.avi` and some `.mov` files are accepted by the server but may not play in the browser.
 - Docker files in the repo are stale and untested; the app is run natively.

@@ -287,3 +287,11 @@ async def test_cleanup_loop_purges_files_survives_errors_and_cancels(upload_dir,
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
+
+
+def test_validate_upload_size_limit_is_a_setting(monkeypatch):
+    from app.services import video_processor as vp
+    monkeypatch.setattr(settings, "MAX_UPLOAD_MB", 1)
+    vp.validate_upload_metadata("a.mp4", 1024 * 1024)
+    with pytest.raises(ValueError, match="1MB"):
+        vp.validate_upload_metadata("a.mp4", 1024 * 1024 + 1)

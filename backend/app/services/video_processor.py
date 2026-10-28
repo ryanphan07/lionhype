@@ -9,10 +9,11 @@ from typing import Any, Dict, List, Optional, Tuple
 import cv2
 import numpy as np
 
+from app.config import settings
+
 logger = logging.getLogger("lionhype.video")
 
 ALLOWED_EXTENSIONS = {".mp4", ".mov", ".avi"}
-MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024  # 100 MB
 
 Box = Tuple[float, float, float, float]  # (x0, y0, x1, y1) as fractions of the frame
 
@@ -38,8 +39,8 @@ def validate_upload_metadata(filename: str, file_size: int) -> None:
             f"Invalid file extension '{ext}'. Allowed extensions are: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
         )
 
-    if file_size > MAX_FILE_SIZE_BYTES:
-        raise ValueError("File size exceeds the maximum limit of 100MB.")
+    if file_size > settings.MAX_UPLOAD_MB * 1024 * 1024:
+        raise ValueError(f"File size exceeds the maximum limit of {settings.MAX_UPLOAD_MB}MB.")
 
 
 def get_video_duration(file_path: str) -> float:

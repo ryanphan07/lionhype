@@ -3,7 +3,7 @@
 ## Project context
 LionHype is a local-first app that turns lion dance videos into humorous, time-synced AI commentary with TTS audio. FastAPI backend (OpenCV frames, OpenAI-compatible multimodal LLM, edge-tts) + React/Vite frontend with WebSocket progress.
 
-Goal: a credible, honest, demoable MVP for a resume (upload a clip of 90s or less; the code currently enforces `MAX_VIDEO_SECONDS` = 60, owner to decide, see TASKS, see progress, get commentary with non-overlapping audio, run locally in a few commands). Do not add features beyond `docs/AUDIT.md` and `TASKS.md` without asking.
+Goal: a credible, honest, demoable MVP for a resume (upload a clip of 90s or less; the goal is now long clips, 10+ min: `MAX_VIDEO_SECONDS` 1800 and `MAX_UPLOAD_MB` 2048 are guards, see docs/DECISIONS.md D1, see progress, get commentary with non-overlapping audio, run locally in a few commands). Do not add features beyond `docs/AUDIT.md` and `TASKS.md` without asking.
 
 ## Environment
 - Windows + PowerShell. Native run; Docker is untested and not part of the MVP.

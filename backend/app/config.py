@@ -35,7 +35,8 @@ class Settings(BaseSettings):
 
     JOB_TTL_SECONDS: int = 3600
     CLEANUP_INTERVAL_SECONDS: int = 600
-    MAX_VIDEO_SECONDS: float = 60.0
+    MAX_VIDEO_SECONDS: float = 1800.0  # guard against accidents; long clips are a goal (docs/DECISIONS.md D1)
+    MAX_UPLOAD_MB: int = 2048
     CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:3000"]
     PUBLIC_BASE_URL: str = "http://localhost:8000"
     UPLOAD_DIR: str = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "uploads"))

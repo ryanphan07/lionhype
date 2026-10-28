@@ -29,7 +29,7 @@ The browser keeps the file as a blob URL for playback; the server never serves v
 | `prompts/commentary_system.txt` | Owner-written announcer prompt; `MAX_QUIPS` replaced at load; cached per process (restart after editing) | Works with the 9B model; quality on real motion not judged |
 
 ### Behavior worth knowing
-- Limits: extensions `.mp4 .mov .avi`, 100 MB, `MAX_VIDEO_SECONDS` (60). Rejections are HTTP 400 `{"detail": ...}` and delete the file.
+- Limits: extensions `.mp4 .mov .avi`, `MAX_UPLOAD_MB` (2048), `MAX_VIDEO_SECONDS` (1800). Long clips (10+ min) are allowed by the limits but untested: see TASKS session 7b. Rejections are HTTP 400 `{"detail": ...}` and delete the file.
 - A window that fails (transport error, unusable JSON after one retry) fails the whole job. A job with zero usable quips fails.
 - TTS failures never fail the job: the quip is kept with `audio_url: null, duration_sec: null`; if no clip has audio the job message is "Commentary ready (audio unavailable)".
 - `schedule_quips`: audio quips are processed in time order and may not start before the previous audio ends + 0.3 s; shift up to `MAX_SHIFT_SEC` (2.0) else drop; no-audio quips never block. Every shift/drop is logged.
