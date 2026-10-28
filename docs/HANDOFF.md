@@ -1,32 +1,35 @@
-# Handoff: Session 3B (safety, errors, cleanup)
+# Handoff: Session 4 (frontend rewire + playback)
 
 ## 1. Done
-- config.py: `MAX_VIDEO_SECONDS=90`, `CLEANUP_INTERVAL_SECONDS=600`. .env.example (new, backend/) lists all settings.
-- video_processor.py: `get_video_duration()` (cap released in finally; fps/frame count <= 0 invalid -> ValueError).
-- main.py: logging.basicConfig (timestamp, level, logger name); lifespan runs `_cleanup_loop` (purge_expired every interval, logs and survives exceptions, cancelled on shutdown); upload checks duration, cleans up via `cleanup_job_files` on any failure incl. HTTPException; `job_store.create` now happens inside the guarded block.
-- jobs.py: `video_paths()` helper so purged jobs' videos can be deleted (purge_expired still returns ids).
-- llm.py, tts.py: use shared `settings`.
-- Tests: +7 in tests/test_api.py (video not served, too long, bad fps, duration helper, generic 500, cleanup on save failure, cleanup loop).
-- Docs: STATE.md section, TASKS.md duration item removed, CONVENTIONS test count 39.
+- frontend/src/App.jsx: upload -> job_id -> WS /ws/analyze/{job_id} (WS_BASE from VITE_API_BASE); progress bar with phase label + message; `errorMessage` shown in an alert box plus toast; on "completed" GET /api/jobs/{id} and set quips; HTTP `detail` shown in toasts. Reconnect: only if not intentionally closed/terminal, max 5, backoff 1s*2^n capped 10s, counter reset on any message. Socket, timers, object URL cleaned on unmount; previous socket closed on new upload. Local file played via createObjectURL, revoked on replace/unmount. File input disabled while a job runs.
+- frontend/src/components/VideoPlayer.jsx: rewritten. Serial audio queue, items >4s stale skipped, video volume 0.3 while commentary plays then restored, audio pauses/resumes with video, seek clears queue and played state, active quip highlighted, click quip seeks, quip 0 now plays, null audio_url shows text "(no audio)", autoplay rejection shows a notice.
+- Removed src/App.css (unused, not imported) and lucide-react (package.json, lock).
 
 ## 2. Decisions and deviations
-- Static mount was already audio-only from 3A; added a test with a real file on disk.
-- Global 500 handler and no `str(exc)` were already done in 3A. Remaining `str(e)` in main.py are our own validation messages (400), not raw exceptions.
-- `except HTTPException: raise` did not exist; the old `except BaseException` only removed the video, now calls `cleanup_job_files`.
-- Duration of 90.0 exactly is allowed; computed as frame_count/fps (container metadata).
-- Nothing committed.
+- Removed the per-quip <audio controls> elements: they bypassed the no-overlap queue.
+- VideoPlayer gets `key={videoUrl}` so state resets per upload (avoids setState in effect).
+- Reconnect logic is nested in `connectSocket` (react-hooks lint forbids self-reference).
+- Heading changed to "LionHype"; removed the extra "Phase" box and spinner (replaced by the label).
+- index.css (template vars/styles) and src/assets/* left untouched; not asked.
+- Committed once; nothing pushed.
 
 ## 3. Results
-- pytest backend/tests -q: PASS, 39. Frontend untouched, lint/build not run.
+- npm run lint: PASS. npm run build: PASS. pytest backend/tests -q: 39 passed.
 
-## 4. Not verified
-- Real upload with real LLM/TTS and footage; cleanup loop timing in a live server (10 min).
-- Duration for files with wrong container metadata (e.g. some .mov).
+## 4. Not verified, test manually (backend on :8000, llama-server on :8080, npm run dev)
+1. Upload a clip <=90s: bar advances, phase label and message change, quips list appears, video plays.
+2. Quip at t~0 plays; commentary never overlaps; video volume drops while speaking and returns after.
+3. Pause video mid-quip: audio pauses; play: resumes. Seek back: quips replay; seek forward: stale ones skipped.
+4. Click a quip: video seeks and that quip plays.
+5. Upload a >90s file and a non-video: toast with backend detail, alert box shown.
+6. Kill backend mid-job: up to 5 reconnects, then "Lost connection" toast. Upload a second clip while the first runs (input is disabled; try after finish) and check no stale updates.
+7. Reload/unmount leaves no console errors; object URL revoked.
+8. Job that completes with a quip whose audio_url is null shows text only.
 
 ## 5. Open issues and risks
-- main.py upload: size still from client-declared multipart size, not streamed-capped.
-- tts.py silently falls back to fake audio on TTS failure.
-- JobStore in-memory, single process; purge only removes terminal jobs.
+- VideoPlayer.jsx: clip durations unknown, so a long clip can delay later quips (dropped if >4s stale).
+- Backend audio_url uses PUBLIC_BASE_URL; must match the API host (config.py).
+- Progress is poll-less WS only; a missed "completed" message after reconnect depends on the server re-sending the snapshot.
 
 ## 6. Suggested next session
-Frontend rewire to the job API (upload -> WS by job_id -> GET result).
+End-to-end on 3 real clips, tune prompt/frame interval, record demo GIF, then docs (README, STATE, TASKS).
