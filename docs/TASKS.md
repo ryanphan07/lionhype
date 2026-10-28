@@ -29,7 +29,7 @@ Goal: a credible, honest, demoable resume MVP, shipped fast. Items are tagged wi
 - [ ] F11: make `vision_spike.py` import `motion_box` from `app.services.video_processor`, or delete the script once tuning is done.
 
 ## Session 10: ship (docs and GIF)
-- [ ] README at the repo root (`git mv docs/README.md README.md` and fix links): what it is, GIF, architecture diagram, prerequisites (Python 3.12, Node 20+, llama-server + model + mmproj), 5-command quickstart, route list, config table, known limitations (60 s clips, minutes of processing, needs internet for TTS, single user, no auth), honest "how it was tested".
+- [ ] README at the repo root (moved to the root 2026-10-28; links still to verify): what it is, GIF, architecture diagram, prerequisites (Python 3.12, Node 20+, llama-server + model + mmproj), 5-command quickstart, route list, config table, known limitations (60 s clips, minutes of processing, needs internet for TTS, single user, no auth), honest "how it was tested".
 - [ ] Add a LICENSE. Final pass on STATE/TASKS. Tag `v0.1.0`.
 - [ ] Resume bullet draft (only claims the repo proves): local multimodal LLM windowed analysis with motion-based crop, time-synced TTS with server-side overlap scheduling, WebSocket job progress, 92+ tests.
 
