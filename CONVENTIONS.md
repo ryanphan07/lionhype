@@ -13,9 +13,12 @@ Goal: a credible, honest, demoable MVP for a resume (upload a clip of 90s or les
 
 ## Commands
 (If any of these is wrong, fix this section.)
-- Backend tests: `pytest backend/tests -q`
-- Backend run: `cd backend` then `uvicorn app.main:app --port 8000`
-- Frontend: `cd frontend` then `npm run lint`, `npm run build`, `npm run dev`
+Run from the repo root in PowerShell unless noted. Verified 2026-10-27: tests (20), lint, build and `uvicorn` all pass/start.
+- Backend setup (once): `cd backend; python -m venv venv; venv\Scripts\Activate.ps1; pip install -r requirements.txt` .
+- Backend tests: `pytest backend/tests -q` (works from the repo root or from `backend/`).
+- Backend run: `cd backend; uvicorn app.main:app --port 8000`. `backend/.env` is resolved relative to `config.py`, so the working directory does not matter for `.env`. `CORS_ORIGINS` (JSON list) is configurable there.
+- Frontend setup (once): `cd frontend; npm install`. Optional `frontend/.env` with `VITE_API_BASE` (default http://localhost:8000); see `.env.example`.
+- Frontend: `cd frontend; npm run lint; npm run build; npm run dev` (dev server on http://localhost:5173).
 
 ## Documentation
 - Update docs once at the end of each work session, not after every edit:
