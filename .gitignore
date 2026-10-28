@@ -18,5 +18,6 @@ frontend/dist/
 .aider*
 
 repomix-output.xml
+spike_frames/
 .history/
 **/.history/

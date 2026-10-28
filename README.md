@@ -38,7 +38,7 @@ llama-server -m <model.gguf> --mmproj <mmproj-F16.gguf> -c 32768 -np 1 -ngl 99 -
 
 # 2. Backend (first time: create the venv and install)
 cd backend
-python -m venv venv; venv\Scripts\Activate.ps1; pip install -r requirements.txt
+python -m venv venv; venv\Scripts\Activate.ps1; pip install -r requirements.txt   # add requirements-dev.txt to run tests
 copy .env.example .env      # optional; every value shown is the default
 uvicorn app.main:app --port 8000
 
@@ -60,7 +60,7 @@ Open http://localhost:5173, choose a clip (`.mp4`, `.mov`, `.avi`; at most 30 mi
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `LLM_BASE_URL`, `LLM_MODEL`, `LLM_TIMEOUT`, `LLM_MAX_TOKENS`, `LLM_ENABLE_THINKING` | `http://127.0.0.1:8080/v1`, ..., 300 s, 500, false | LLM endpoint and limits |
+| `LLM_BASE_URL`, `LLM_MODEL`, `LLM_TIMEOUT`, `LLM_MAX_TOKENS`, `LLM_TEMPERATURE`, `LLM_ENABLE_THINKING` | `http://127.0.0.1:8080/v1`, local, 300 s, 500, 0.8, false | LLM endpoint and limits |
 | `WINDOW_SECONDS`, `FRAMES_PER_WINDOW`, `FRAME_WIDTH` | 10, 6, 896 | Vision windowing |
 | `MAX_QUIPS_PER_WINDOW`, `MIN_QUIP_GAP_SEC` | 3, 4.5 | Quip budget (4.5 s is about the speech time of an 8-word line) |
 | `TTS_VOICE`, `TTS_RATE`, `TTS_TIMEOUT_SECONDS`, `TTS_CONCURRENCY`, `TTS_ENABLED` | en-US-GuyNeural, +10%, 30, 4, true | Speech |

@@ -12,10 +12,11 @@ class Settings(BaseSettings):
 
     LLM_BASE_URL: str = "http://127.0.0.1:8080/v1"
     LLM_API_KEY: str = "local-key"
-    LLM_MODEL: str = "qwen-coder"
+    LLM_MODEL: str = "local"  # llama-server serves whatever it loaded; the name is not used for routing
     LLM_TIMEOUT: float = 300.0  # seconds per call; a slow local model needs minutes per window
     LLM_ENABLE_THINKING: bool = False
     LLM_MAX_TOKENS: int = 500
+    LLM_TEMPERATURE: float = 0.8
 
     WINDOW_SECONDS: float = 10.0
     FRAMES_PER_WINDOW: int = 6
@@ -23,7 +24,6 @@ class Settings(BaseSettings):
     MAX_QUIPS_PER_WINDOW: int = 3
     MIN_QUIP_GAP_SEC: float = 4.5  # measured TTS: about 4.5 s for an 8-word line
 
-    TTS_PROVIDER: str = "edge_tts"
     TTS_VOICE: str = "en-US-GuyNeural"
     TTS_RATE: str = "+10%"
     TTS_ENABLED: bool = True

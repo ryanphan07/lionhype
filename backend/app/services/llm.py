@@ -108,7 +108,7 @@ async def _call(messages: List[Dict[str, Any]], frame_count: int, label: str) ->
     response = await llm_client.chat.completions.create(
         model=settings.LLM_MODEL,
         messages=messages,
-        temperature=0.8,
+        temperature=settings.LLM_TEMPERATURE,
         max_tokens=settings.LLM_MAX_TOKENS,
         extra_body={"chat_template_kwargs": {"enable_thinking": settings.LLM_ENABLE_THINKING}},
     )

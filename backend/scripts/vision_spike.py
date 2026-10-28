@@ -17,10 +17,14 @@ import base64
 import json
 import os
 import re
+import sys
 import time
 
 import cv2
 import numpy as np
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from app.services.video_processor import motion_box  # noqa: E402  (single shared implementation)
 
 DEFAULT_SYSTEM = (
     "You are an energetic, funny lion dance sports commentator. You are shown frames from "
@@ -28,67 +32,6 @@ DEFAULT_SYSTEM = (
     '{"what_is_happening": "<2 sentences describing the visible action>", '
     '"commentary": [{"timestamp": <seconds>, "text": "<max 12 words>"}]}'
 )
-
-
-def motion_box(cap, duration, probe=30, probe_w=320, thresh=30, min_hits=3, min_brightness=50):
-    """Return (x0, y0, x1, y1) as fractions of the frame covering where the bright, moving subjects are.
-
-    Motion is counted only where the scene is lit (dark audience areas full of tiny phone lights and
-    sensor noise are ignored), and speckle is removed with a morphological opening.
-    """
-    grays = []
-    for i in range(probe):
-        cap.set(cv2.CAP_PROP_POS_MSEC, duration * (i + 0.5) / probe * 1000)
-        ok, frame = cap.read()
-        if not ok:
-            continue
-        h, w = frame.shape[:2]
-        small = cv2.resize(frame, (probe_w, max(1, int(h * probe_w / w))), interpolation=cv2.INTER_AREA)
-        gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
-        grays.append(cv2.GaussianBlur(gray, (5, 5), 0).astype(np.float32))
-    if len(grays) < 4:
-        return None
-    stack = np.stack(grays)
-    background = np.median(stack, axis=0)
-    lit = stack.max(axis=0) > min_brightness
-    hits = ((np.abs(stack - background) > thresh) & lit).sum(axis=0)
-    mask = (hits >= min_hits).astype(np.uint8)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
-    if mask.sum() < 20:
-        return None
-    gh, gw = mask.shape
-
-    def span(profile, keep=0.2, smooth=7, gap=10):
-        """Largest high-energy run in a 1-D motion profile (ignores isolated flicker far from the action)."""
-        profile = np.convolve(profile.astype(np.float32), np.ones(smooth) / smooth, mode="same")
-        idx = np.nonzero(profile >= keep * profile.max())[0]
-        runs, start, prev = [], idx[0], idx[0]
-        for i in idx[1:]:
-            if i - prev > gap:
-                runs.append((start, prev))
-                start = i
-            prev = i
-        runs.append((start, prev))
-        best = max(runs, key=lambda r: profile[r[0]:r[1] + 1].sum())
-        return best[0], best[1] + 1
-
-    cx0, cx1 = span(mask.sum(axis=0))
-    cy0, cy1 = span(mask.sum(axis=1))
-    x0, x1, y0, y1 = cx0 / gw, cx1 / gw, cy0 / gh, cy1 / gh
-    # pad around the box, enforce a minimum size, clamp to the frame
-    bw, bh = x1 - x0, y1 - y0
-    x0, x1 = x0 - 0.12 * bw - 0.02, x1 + 0.12 * bw + 0.02
-    y0, y1 = y0 - 0.12 * bh - 0.02, y1 + 0.12 * bh + 0.02
-    if x1 - x0 < 0.35:
-        mid = (x0 + x1) / 2
-        x0, x1 = mid - 0.175, mid + 0.175
-    if y1 - y0 < 0.25:
-        mid = (y0 + y1) / 2
-        y0, y1 = mid - 0.125, mid + 0.125
-    x0, y0, x1, y1 = max(0.0, x0), max(0.0, y0), min(1.0, x1), min(1.0, y1)
-    if (x1 - x0) * (y1 - y0) > 0.8:  # motion everywhere: cropping would not help
-        return None
-    return float(x0), float(y0), float(x1), float(y1)
 
 
 def sample_frames(path, n, width, crop_mode):
