@@ -79,6 +79,11 @@ cd frontend; npm run lint; npm run build
 ```
 Not covered by automated tests: the real model, the real TTS service, browser playback sync.
 
+## Troubleshooting
+- Progress stops and the page says "Live updates lost": on Windows, selecting text in the backend console window (QuickEdit) pauses the server until you press Enter. Press Enter, or turn QuickEdit off in the console properties.
+- Job fails with "The AI model is not reachable": start llama-server (see Quickstart) and check `LLM_BASE_URL`.
+- No audio, "audio unavailable" notice: edge-tts needs internet and `edge-tts>=7.3.1`.
+
 ## Known limitations
 - Single user, in-memory jobs, no auth, one job at a time (a second upload gets 409; the LLM server is single-slot). Starting the backend deletes leftover files in `uploads/videos` and `uploads/audio`.
 - Processing is slow on local hardware: about 45 s per 10 s of video on a 9B model, so a 10 minute clip takes roughly 45 minutes. One failed window fails the whole job; jobs are lost on restart.

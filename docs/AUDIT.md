@@ -1,4 +1,49 @@
-# LionHype audit 3 (2026-10-28)
+# LionHype audit 4 (2026-10-28)
+
+Fourth full audit, after session 11. Re-ran tests, lint, build and `npm audit`; reviewed the session 11 code (retry removal, stale-job lock, error mapping, dropped-clip cleanup, frontend polling); and exercised the real uvicorn server with real WebSocket and HTTP calls while the LLM was down. llama-server, uvicorn and Vite were stopped again, so there is still no live LLM, TTS-timing or browser verification since session 6. Earlier audits are kept below as history; their open items still apply unless marked fixed.
+Tags: BLOCKS-DEMO / SHOULD-FIX / POLISH / INFO. Line refs are relative to `backend/app/` unless a path is given.
+
+## Baseline
+
+| Check | Result |
+|---|---|
+| `pytest backend/tests -q` | 101 passed, 3 s |
+| `npm run lint` / `build` / `audit --omit=dev` | clean / ok / 0 vulnerabilities |
+| Fresh installs | venv from `requirements-dev.txt` and `npm ci` both verified (session 11) |
+| Real-server probe (LLM down) | upload 200; job fails in about 4 s with "The AI model is not reachable or timed out. Is llama-server running?"; GET shows the same; video deleted; the next upload is accepted (confirms N2, N4, N6 behavior on a live server) |
+| Working tree | clean, HEAD `6d52a3d`; no LICENSE |
+
+## Goal check
+
+| Goal | Status |
+|---|---|
+| Upload, progress, real vision-LLM commentary, non-overlapping TTS | Implemented. Last live LLM+TTS run was before the timing fixes; browser behavior unverified since session 6 |
+| Long clips (10+ min, D1) | Limits and failure handling are in place; not yet run. Remaining risks: all-or-nothing job (D4), TTS retries (M2), unmeasured 35B throughput |
+| Honest (no fake output) | Yes; errors are now specific and safe |
+| Local, few commands | Yes; quickstart verified from fresh installs |
+| Ship: README, GIF, LICENSE, tag | README done; GIF, LICENSE, tag missing. All three depend on a live run or your choice |
+
+Critical path to v0.1.0: (1) quick safety/robustness fixes below, (2) you decide D4, (3) a live session with llama-server and a browser, (4) GIF, LICENSE, tag. Everything still code-only is small; everything else needs you at the machine.
+
+## New findings
+
+| # | Tag | Finding | Evidence |
+|---|---|---|---|
+| M1 | SHOULD-FIX (safety) | **The startup sweep can delete the wrong folder.** It removes every entry in `<UPLOAD_DIR>/videos` and `<UPLOAD_DIR>/audio`, and `UPLOAD_DIR` is documented as configurable. On Windows folder names are case-insensitive, so `UPLOAD_DIR=C:/Users/you` makes `videos` match the user's own `Videos` folder. The default (`backend/uploads`) is safe; a custom value is not | `services/pipeline.py` `sweep_uploads`; `backend/.env.example:35` |
+| M2 | SHOULD-FIX (long clips) | **No TTS retry.** Session 6 removed retries. edge-tts is an unofficial endpoint and a 10-minute clip needs roughly 100-500 requests, so a transient failure or throttling silently removes a line's audio. One retry with a short delay is cheap; per-clip progress would also keep the stale-job timer honest | `services/tts.py` `generate_audio_clip`, `services/commentary.py` |
+| M3 | POLISH | `friendly_error` maps every HTTP status error from the LLM server (for example a 400 "context too large" for big frames, or a 500) to "not reachable or timed out", which misleads when the server is up | `services/pipeline.py` `friendly_error` |
+| M4 | POLISH | A stale job is marked failed but its pipeline task is not cancelled, so a truly hung job could keep using the LLM while a new upload starts a second one | `services/jobs.py` `has_active` |
+| M5 | INFO (Windows) | **Console quirks can freeze the server.** Logging writes to the console synchronously on the event loop. On Windows, selecting text in the console (QuickEdit) pauses the process on its next write, which freezes the server and drops WebSockets until you press Enter. A related case reproduced during this audit: a server whose stdout pipe was not read blocked the loop and the WebSocket died with a keepalive timeout. Worth a README troubleshooting line; not a code bug | `backend/app/main.py` logging setup |
+| M6 | INFO | Session 11 code reviewed with no defects beyond M3/M4: polling guards against stale jobs and unmount, `remove_clip_file` validates names and the video id, `schedule_quips` still returns copies, the stale check uses wall-clock `updated_at`. The frontend polling path has no test and has not been run in a browser | `frontend/src/App.jsx`, `services/tts.py`, `services/jobs.py` |
+| M7 | INFO | Still open from earlier audits: D4 (long-job strategy), N7 (`seen` continuity), refresh-resume, F7 (edge-tts is unofficial), F9 (Docker files; deletion needs your OK), F13, F14, F16, F17, CLAUDE.md contradictions (90 s, 35B only), LICENSE, GIF | history below |
+
+## Plan
+See `docs/TASKS.md`. Next: session 12 (M1, M2, M3, M4, README note), your D4 decision, session 8 live run, then ship.
+
+---
+# History
+
+## Audit 3 (2026-10-28, after sessions 7, 7b, 9)
 
 Third full audit, after sessions 7, 7b and 9. Read every service, the job API, both frontend files and the tests again, re-ran tests/lint/build/audit, and probed the SDK and server behavior directly. No live LLM run this time: llama-server, uvicorn and Vite were all stopped. Audit 2 (kept below as history) still holds for everything not mentioned here.
 Tags: BLOCKS-DEMO / SHOULD-FIX / POLISH / INFO. Line refs are relative to `backend/app/` unless a path is given.
@@ -52,7 +97,7 @@ Tags: BLOCKS-DEMO / SHOULD-FIX / POLISH / INFO. Line refs are relative to `backe
 See `docs/TASKS.md`. Order: (1) robustness before any long-clip run: N2, N5, N6, N4, N1 (about one session, all small); (2) decide D4 (partial results and failure policy); (3) real footage in the browser, short then 10+ min, on 9B then 35B; (4) GIF, LICENSE, fresh-venv check, tag v0.1.0.
 
 ---
-# History
+## Audit 2 and audit 1 (older history)
 
 ### Audit 2 baseline (historical)
 

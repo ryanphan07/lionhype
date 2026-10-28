@@ -56,5 +56,8 @@ The browser keeps the file as a blob URL for playback; the server never serves v
 ## Known gaps for long clips (audit 3)
 The pipeline handles long clips by limits only. Not yet robust: all-or-nothing results (D4), no resume after a page refresh. (SDK retries, the stuck lock and generic errors were fixed in session 11.) See TASKS session 11 and DECISIONS D4.
 
+## Verified on a live server (2026-10-28, audit 4)
+With the LLM stopped: upload accepted, job fails in about 4 s with the categorized message over both WebSocket and GET, source video deleted, next upload accepted. Everything LLM-, TTS-timing- or browser-related is still as last verified in sessions 5-6.
+
 ## Maturity
 Local-first prototype that runs end to end with no fake output. Not hardened: single in-memory job store, no auth, no queue, unpinned dependencies, one unofficial TTS endpoint. Honest and demoable once the README/GIF exist and real-footage runs are done (timing defects F1-F3 are fixed in code, not yet re-run live).

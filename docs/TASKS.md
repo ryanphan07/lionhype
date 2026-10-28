@@ -1,4 +1,4 @@
-# LionHype tasks (2026-10-28, after audit 3)
+# LionHype tasks (2026-10-28, after audit 4)
 
 Goal: a credible, honest, demoable resume MVP, shipped fast. Items are tagged with audit ids (`docs/AUDIT.md`). Do not add features beyond this list without asking.
 
@@ -6,6 +6,13 @@ Goal: a credible, honest, demoable resume MVP, shipped fast. Items are tagged wi
 1. Clip length: long clips (10+ min) are a goal; limits become settings (session 7b).
 2. Models: develop on the 9B, use the 35B-A3B for real runs.
 3. TTS fallback: owner unsure; keep edge-tts + text-only fallback until v0.1.0, then consider an offline provider (D3).
+
+## Session 12: safety and long-clip hardening (next; small, code-only)
+- [ ] M1: make `sweep_uploads` delete only files this app created: job-id-prefixed videos (`<32 hex>_*`) and 32-hex audio folders; leave everything else. Test that unrelated files in the folders survive.
+- [ ] M2: one TTS retry with a short delay (setting `TTS_RETRIES`, default 1); consider reporting progress per finished clip so the stale-job timer stays honest on long clips. Test with a fake that fails once.
+- [ ] M3: `friendly_error`: HTTP status errors from the LLM server say "The AI model rejected the request" (with the status in the server log only); connection errors and timeouts keep the current text.
+- [ ] M4: when a stale job is failed, cancel its pipeline task (keep a task handle per job) so a hung job cannot keep running in the background.
+- [ ] M5: README troubleshooting: on Windows, clicking in the console window pauses the server (QuickEdit); press Enter, or disable QuickEdit.
 
 ## Session 11: robustness before long clips - DONE 2026-10-28 except optional N7
 - [x] N2: `AsyncOpenAI(max_retries=0)`; a window now fails when its own timeout fires (tested: client setting).
