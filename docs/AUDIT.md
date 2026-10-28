@@ -7,7 +7,7 @@ Tags: BLOCKS-DEMO / SHOULD-FIX / POLISH / INFO. Line refs are relative to `backe
 
 | Check | Result |
 |---|---|
-| `pytest backend/tests -q` | 95 passed, 10.5 s (was 3 s: see N5) |
+| `pytest backend/tests -q` | 95 passed, 10.5 s (was 3 s: see N5; fixed in session 11) |
 | `npm run lint` / `build` / `audit --omit=dev` | clean / ok / 0 vulnerabilities |
 | Working tree | clean except ignored files; HEAD `4faf1b7` |
 | Services | none running; llama-server not reachable, so F1-F3 fixes are tested but not re-run live |
@@ -30,10 +30,10 @@ Tags: BLOCKS-DEMO / SHOULD-FIX / POLISH / INFO. Line refs are relative to `backe
 | # | Tag | Finding | Evidence |
 |---|---|---|---|
 | N1 | SHOULD-FIX (long clips) | **The browser gives up after about 25 s without a WebSocket and cannot recover the job.** Reconnect is 5 tries at 1, 2, 4, 8, 10 s, then "Lost connection" and the job id is dropped. There is no polling fallback and the id is not persisted, so a laptop sleep or tab throttle during a 45-minute job loses a result the server still finishes. The video is a blob URL, so a reload loses the file too | `frontend/src/App.jsx:10-11,104-115` |
-| N2 | SHOULD-FIX | **The OpenAI SDK silently retries.** `AsyncOpenAI` defaults to `max_retries=2` (verified: 2). A hung window can take 3 x 300 s = 15 min to fail, and a down server retries with backoff. This contradicts the docstring ("no retry: a slow model would double the wait") | `services/llm.py:18-22,134-137` |
+| N2 | FIXED (session 11) | **The OpenAI SDK silently retries.** `AsyncOpenAI` defaults to `max_retries=2` (verified: 2). A hung window can take 3 x 300 s = 15 min to fail, and a down server retries with backoff. This contradicts the docstring ("no retry: a slow model would double the wait") | `services/llm.py:18-22,134-137` |
 | N3 | SHOULD-FIX (long clips) | **All-or-nothing job.** Nothing is returned until every window and every TTS clip is done, and one failed window fails the job after up to 45 minutes of work. No checkpointing and a restart loses it. Needs a design decision (DECISIONS D4) | `services/commentary.py:83-105,110-135` |
 | N4 | SHOULD-FIX | **Every failure shows the same message**, "Commentary generation failed": LLM server down, unusable JSON, unreadable video and TTS bugs are indistinguishable to the user and in a demo. Safe categories ("The AI model is not reachable", "The model returned unusable output") would help without leaking details | `services/pipeline.py:59-65` |
-| N5 | SHOULD-FIX | **A test hits the real network.** `test_second_upload_while_a_job_runs_is_rejected` completes a real upload without the `fake_ai` fixture, so the pipeline tries 127.0.0.1:8080 (7.7 s of SDK retries now; it would run a real analysis if llama-server were up). Non-deterministic and slow | `backend/tests/test_api.py` (last test) |
+| N5 | FIXED (session 11) | **A test hits the real network.** `test_second_upload_while_a_job_runs_is_rejected` completes a real upload without the `fake_ai` fixture, so the pipeline tries 127.0.0.1:8080 (7.7 s of SDK retries now; it would run a real analysis if llama-server were up). Non-deterministic and slow | `backend/tests/test_api.py` (last test) |
 | N6 | SHOULD-FIX | **The one-job guard can wedge.** `has_active()` counts any non-terminal job forever. If a pipeline never reaches `complete`/`fail` (hang outside the LLM timeout, a crash that is not an `Exception`), every upload returns 409 until the server restarts | `services/jobs.py` `has_active` |
 | N7 | POLISH | **Long clips will repeat jokes.** Only the last two quip texts carry across windows, and the model's own `seen` summary is logged but discarded. Over 60 windows expect "blue lion bows" repeatedly. Passing the last 2-3 `seen` lines is a small prompt change | `services/llm.py:148`, `services/commentary.py:106-108` |
 | N8 | POLISH | **Throughput levers for long clips, none tried:** fewer or smaller frames (`FRAMES_PER_WINDOW`, `FRAME_WIDTH` 640), longer windows (20 s), fewer quips, and parallel windows with `llama-server -np 2` (requires dropping the previous-quips dependency). Cost per window is prefill (about 3.2k tokens) plus decode (about 160 tokens) | `config.py` |

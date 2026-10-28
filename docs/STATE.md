@@ -42,7 +42,7 @@ The browser keeps the file as a blob URL for playback; the server never serves v
 - `components/VideoPlayer.jsx`: blob-URL video, quip queue driven by `timeupdate`, one clip at a time, video ducked to 0.3 while a clip plays, stale lines (older than 4 s) skipped, seek resets, pause/resume handled, autoplay-block notice, "audio unavailable" notice, clickable commentary list that seeks.
 - Lint and build pass. No frontend tests. Browser behavior (progress, sync, seek) has not been re-verified since session 6.
 
-## Tests: 95 passing (`pytest backend/tests -q`)
+## Tests: 96 passing (`pytest backend/tests -q`)
 - `test_jobs.py` JobStore. `test_api.py` upload, job GET, WebSocket, cleanup, videos not served, validators. `test_commentary.py` orchestration with LLM/TTS faked. `test_vision.py` crop, windows, frame sampling on real tiny videos, prompt/message building, parser, finalize, window failure. `test_audio.py` TTS success/failure/timeout/no leftover files, mutagen on a hand-built mp3, `schedule_quips`, `audio_available`, parser edge cases.
 - Not covered: real LLM or real edge-tts in CI (both need external services), real `motion_box` on moving-subject video, frontend.
 
@@ -53,7 +53,7 @@ The browser keeps the file as a blob URL for playback; the server never serves v
 - edge-tts must be >= 7.3.1 (7.2.8 gets 403).
 
 ## Known gaps for long clips (audit 3)
-The pipeline handles long clips by limits only. Not yet robust: SDK retries (up to 15 min to fail a window), no polling fallback when the WebSocket drops, all-or-nothing results, a one-job lock that can wedge, generic error text. See TASKS session 11 and DECISIONS D4.
+The pipeline handles long clips by limits only. Not yet robust: no polling fallback when the WebSocket drops, all-or-nothing results, a one-job lock that can wedge, generic error text. (SDK retries fixed in session 11.) See TASKS session 11 and DECISIONS D4.
 
 ## Maturity
 Local-first prototype that runs end to end with no fake output. Not hardened: single in-memory job store, no auth, no queue, unpinned dependencies, one unofficial TTS endpoint. Honest and demoable once the README/GIF exist and real-footage runs are done (timing defects F1-F3 are fixed in code, not yet re-run live).

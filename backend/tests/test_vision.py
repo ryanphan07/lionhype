@@ -390,3 +390,7 @@ async def test_total_pipeline_time_is_logged(monkeypatch, two_windows, caplog):
     with caplog.at_level(logging.INFO, logger="lionhype.commentary"):
         await commentary_module.process_video_commentary("v.mp4", job_id="timed")
     assert "finished in" in caplog.text
+
+
+def test_llm_client_does_not_retry_on_its_own():
+    assert llm_module.llm_client.max_retries == 0

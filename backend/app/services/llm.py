@@ -19,6 +19,7 @@ llm_client = AsyncOpenAI(
     base_url=settings.LLM_BASE_URL,
     api_key=settings.LLM_API_KEY,
     timeout=settings.LLM_TIMEOUT,
+    max_retries=0,  # the SDK default of 2 would turn one 300 s timeout into 15 minutes
 ) if AsyncOpenAI is not None else None
 
 PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "commentary_system.txt"

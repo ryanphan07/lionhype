@@ -8,8 +8,8 @@ Goal: a credible, honest, demoable resume MVP, shipped fast. Items are tagged wi
 3. TTS fallback: owner unsure; keep edge-tts + text-only fallback until v0.1.0, then consider an offline provider (D3).
 
 ## Session 11: robustness before long clips (SHOULD-FIX, all small, do next)
-- [ ] N2: `AsyncOpenAI(max_retries=0)` so a window fails when its own timeout fires; test that a transport error is raised once.
-- [ ] N5: make `test_second_upload_while_a_job_runs_is_rejected` use `fake_ai` (no network); suite should drop back to about 3 s.
+- [x] N2: `AsyncOpenAI(max_retries=0)`; a window now fails when its own timeout fires (tested: client setting).
+- [x] N5: that test uses `fake_ai`; suite back to about 3 s.
 - [ ] N6: let `has_active()` ignore jobs idle longer than a stale limit (e.g. `JOB_STALE_SECONDS`, default 2x `LLM_TIMEOUT`), marking them failed; test with a fake clock.
 - [ ] N4: map failures to safe messages ("The AI model is not reachable", "The model returned unusable output", "The video could not be processed"); log the detail server-side; test each category.
 - [ ] N1: frontend: when the WebSocket is lost, fall back to polling `GET /api/jobs/{id}` every 5 s until terminal (no 5-try limit); keep `job_id` in sessionStorage so a refresh can resume status (the video blob needs re-selecting; show that).

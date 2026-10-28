@@ -308,7 +308,7 @@ def test_startup_sweep_removes_leftovers(tmp_path, monkeypatch):
     assert os.listdir(tmp_path / "videos") == [] and os.listdir(tmp_path / "audio") == []
 
 
-def test_second_upload_while_a_job_runs_is_rejected(client, upload_dir, video_bytes):
+def test_second_upload_while_a_job_runs_is_rejected(client, upload_dir, video_bytes, fake_ai):
     from app.services.jobs import job_store
     job_store.create(str(upload_dir / "videos" / "busy.avi"), job_id="busy")
     try:
