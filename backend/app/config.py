@@ -20,9 +20,8 @@ class Settings(BaseSettings):
     WINDOW_SECONDS: float = 10.0
     FRAMES_PER_WINDOW: int = 6
     FRAME_WIDTH: int = 896
-    MAX_QUIPS_PER_WINDOW: int = 4
-    MIN_QUIP_GAP_SEC: float = 2.5
-    QUIP_WORDS_PER_SECOND: float = 2.5
+    MAX_QUIPS_PER_WINDOW: int = 3
+    MIN_QUIP_GAP_SEC: float = 4.5  # measured TTS: about 4.5 s for an 8-word line
 
     TTS_PROVIDER: str = "edge_tts"
     TTS_VOICE: str = "en-US-GuyNeural"

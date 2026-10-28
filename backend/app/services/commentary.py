@@ -12,33 +12,24 @@ from app.services import video_processor as video_processor_service
 logger = logging.getLogger("lionhype.commentary")
 
 
-LAST_QUIP_MAX_WORDS = 14
-MIN_QUIP_WORDS = 3
 AUDIO_GAP_SEC = 0.3
 
 
 def finalize_timeline(quips: List[Dict[str, Any]], duration: float) -> List[Dict[str, Any]]:
-    """Sort, clamp to the video, enforce the minimum gap, and cut each quip to fit the time before the next."""
+    """Sort, clamp to the video, enforce the minimum gap, drop empty text. Text is never cut: overlong lines are
+    handled by schedule_quips after their real audio duration is known."""
     clamped = [
-        {"timestamp": min(max(q["timestamp"], 0.0), duration), "text": q["text"]}
+        {"timestamp": round(min(max(q["timestamp"], 0.0), duration), 2), "text": " ".join(q["text"].split())}
         for q in sorted(quips, key=lambda q: q["timestamp"])
     ]
     kept: List[Dict[str, Any]] = []
     for quip in clamped:
+        if not quip["text"]:
+            continue
         if kept and quip["timestamp"] - kept[-1]["timestamp"] < settings.MIN_QUIP_GAP_SEC:
             continue
         kept.append(quip)
-    result = []
-    for i, quip in enumerate(kept):
-        if i + 1 < len(kept):
-            gap = kept[i + 1]["timestamp"] - quip["timestamp"]
-            max_words = max(MIN_QUIP_WORDS, int(gap * settings.QUIP_WORDS_PER_SECOND))
-        else:
-            max_words = LAST_QUIP_MAX_WORDS
-        text = " ".join(quip["text"].split()[:max_words])
-        if text:
-            result.append({"timestamp": quip["timestamp"], "text": text})
-    return result
+    return kept
 
 
 def schedule_quips(quips: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -56,7 +47,7 @@ def schedule_quips(quips: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                     logger.warning("Dropping quip at t=%.2f: would need a %.2fs shift (max %.2fs)", start, shift, settings.MAX_SHIFT_SEC)
                     continue
                 logger.info("Shifting quip from t=%.2f to t=%.2f to avoid audio overlap", start, new_start)
-                quip["timestamp"] = start = new_start
+                quip["timestamp"] = start = round(new_start, 2)
             audio_end = start + quip["duration_sec"]
         result.append(quip)
     return result

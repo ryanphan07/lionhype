@@ -281,21 +281,15 @@ def test_finalize_sorts_clamps_and_drops_close_quips():
 
 
 def test_finalize_gap_is_inclusive_and_far_quips_clamp_to_duration():
-    out = commentary_module.finalize_timeline([q(0.0, "a b c"), q(2.4, "dropped"), q(2.5, "kept"), q(99.0, "clamped")], 10.0)
-    assert texts_at(out) == [(0.0, "a b c"), (2.5, "kept"), (10.0, "clamped")]
+    out = commentary_module.finalize_timeline([q(0.0, "a b c"), q(4.4, "dropped"), q(4.5, "kept"), q(99.0, "clamped")], 10.0)
+    assert texts_at(out) == [(0.0, "a b c"), (4.5, "kept"), (10.0, "clamped")]
 
 
-def test_finalize_word_budget_from_gap_to_next_and_last_quip_14():
-    out = commentary_module.finalize_timeline(
-        [q(0.0, words(20)), q(4.0, words(20)), q(6.5, words(20)), q(10.0, words(40))], 20.0
-    )
-    assert [len(o["text"].split()) for o in out] == [10, 6, 8, 14]  # int(gap * 2.5); last quip 14
-
-
-def test_finalize_minimum_three_words(monkeypatch):
-    monkeypatch.setattr(settings, "MIN_QUIP_GAP_SEC", 0.5)
-    out = commentary_module.finalize_timeline([q(0.0, words(20)), q(0.8, words(20))], 10.0)
-    assert len(out[0]["text"].split()) == 3  # int(0.8 * 2.5) = 2, raised to the minimum
+def test_finalize_never_cuts_text_and_rounds_timestamps():
+    long = words(30)
+    out = commentary_module.finalize_timeline([q(0.123456, long), q(5.0, words(20))], 20.0)
+    assert out[0]["timestamp"] == 0.12
+    assert [o["text"] for o in out] == [long, words(20)]
 
 
 def test_finalize_drops_empty_text():
@@ -306,6 +300,7 @@ def test_finalize_drops_empty_text():
 
 @pytest.fixture
 def two_windows(monkeypatch):
+    monkeypatch.setattr(settings, "MIN_QUIP_GAP_SEC", 2.5)
     vp_ = commentary_module.video_processor_service
     monkeypatch.setattr(vp_, "get_video_duration", lambda p: 20.0)
     monkeypatch.setattr(vp_, "compute_crop_box", lambda p, d: None)

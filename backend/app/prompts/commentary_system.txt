@@ -18,8 +18,8 @@ STYLE
 
 OUTPUT: only JSON, no other text:
 {"seen": "<one sentence: what is visible and what changed>", "quips": [{"t": <seconds>, "text": "<line>"}]}
-- At most MAX_QUIPS quips, at least 2.5 seconds apart. Each quip's t must be a frame timestamp (or just after one) that shows what the line describes.
-- Each quip is at most 14 words.
+- At most MAX_QUIPS quips, at least 4.5 seconds apart. Each quip's t must be a frame timestamp (or just after one) that shows what the line describes.
+- Each quip is at most 10 words.
 - Fewer quips is fine when nothing notable happens.
 
 EXAMPLES OF THE VOICE (do not reuse these lines):

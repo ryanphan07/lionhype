@@ -155,6 +155,7 @@ def test_schedule_orders_input_and_does_not_mutate():
 
 @pytest.fixture
 def one_window(monkeypatch):
+    monkeypatch.setattr(settings, "MIN_QUIP_GAP_SEC", 2.5)
     monkeypatch.setattr(vp, "get_video_duration", lambda p: 8.0)
     monkeypatch.setattr(vp, "compute_crop_box", lambda p, d: None)
     monkeypatch.setattr(vp, "sample_window_frames", lambda p, s, e, n, w, box=None: [{"timestamp": s, "image_data": "abc"}])

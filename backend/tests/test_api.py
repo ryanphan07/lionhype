@@ -32,6 +32,7 @@ def client(upload_dir):
 
 @pytest.fixture
 def fake_ai(monkeypatch):
+    monkeypatch.setattr(settings, "MIN_QUIP_GAP_SEC", 2.5)
     async def fake_llm(frames, start, end, previous=None, label=""):
         return [{"timestamp": 0.0, "text": "first"}, {"timestamp": 3.0, "text": "second"}]
 
