@@ -11,7 +11,7 @@ Tags: BLOCKS-DEMO / SHOULD-FIX / POLISH / INFO. Line refs are relative to `backe
 | `npm run lint` / `build` / `audit --omit=dev` | clean / ok / 0 vulnerabilities |
 | Working tree | clean except ignored files; HEAD `4faf1b7` |
 | Services | none running; llama-server not reachable, so F1-F3 fixes are tested but not re-run live |
-| Fresh-venv install | not done (requirements are pinned and `websockets` added, but never built from scratch) |
+| Fresh-venv install | done in session 11: new venv from requirements-dev.txt, 101 passed; fresh `npm ci` + lint + build ok |
 
 ## Goal check
 

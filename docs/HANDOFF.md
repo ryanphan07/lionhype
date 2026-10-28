@@ -1,29 +1,27 @@
-# Handoff: audit 3 (2026-10-28)
+# Handoff: session 11 (robustness before long clips)
 
 ## 1. Done
-- docs/AUDIT.md: new audit 3 on top (baseline, goal check, findings N1-N11, verified-good list, plan); audits 1-2 kept as history.
-- docs/TASKS.md: new session 11 (robustness before long clips), D4 decision item, throughput experiments, reordered pointers.
-- docs/DECISIONS.md: D4 (long-job strategy: A all-or-nothing, B skip failed windows, C progressive results; recommends B then C).
-- docs/STATE.md, README.md: long-clip gaps note, DECISIONS link. No source code changed.
+- llm.py: `max_retries=0` (N2). jobs.py/config: `JOB_STALE_SECONDS` 1800, `has_active()` fails stale jobs (N6).
+- pipeline.py: `friendly_error` safe categorized job errors (N4); commentary.py raises `LLMOutputError` for "no usable commentary".
+- commentary.py/tts.py: `schedule_quips(quips, video_duration)` drops quips shifted past the end; `tts.remove_clip_file` deletes dropped clips (N10).
+- App.jsx: polling fallback after WebSocket reconnects are exhausted (N1).
+- tests: hermetic upload-lock test (N5), new tests for each item. Docs (TASKS, AUDIT, STATE, README, CONVENTIONS) updated after each commit.
 
 ## 2. Decisions and deviations
-- Audit only: found bugs are listed, not fixed. CLAUDE.md not edited (still says 90 s and the 35B only).
-- No live run: llama-server, uvicorn and Vite were stopped.
+- N7 (`seen` continuity) not done: it changes `analyze_window`'s return shape. Refresh-resume part of N1 not done (needs a re-select-video flow).
+- D4 (long-job strategy), LICENSE, Docker deletion, CLAUDE.md update are yours; not touched.
 
 ## 3. Results
-- pytest backend/tests -q: 95 passed (10.5 s). npm run lint clean, build ok, npm audit 0.
+- pytest backend/tests -q: 101 passed (3 s). Frontend lint clean, build ok. Fresh venv and fresh `npm ci` both verified.
 
 ## 4. Not verified, needs manual testing
-1. Live re-check of the F1-F3 timing fixes and browser playback (progress, sync, seek, pause, error paths).
-2. Fresh-venv install from requirements.txt.
-3. A 10+ minute clip on 9B and 35B.
+1. Polling fallback in a browser: start a job, stop and restart nothing but kill the WS (e.g. restart uvicorn mid-job gives 404 message; briefly block the port instead).
+2. Live re-check of timing fixes and playback with llama-server up (session 8).
+3. Error messages with llama-server stopped: expect "The AI model is not reachable...".
 
 ## 5. Open issues and risks
-- llm.py:18-22 SDK max_retries=2: a hung window can take 15 min to fail.
-- App.jsx:104-115 gives up after about 25 s of WS loss, no polling fallback.
-- commentary.py:83-135 all-or-nothing job (D4).
-- jobs.py has_active can wedge uploads with 409.
-- test_api.py last test uses the real network (7.7 s).
+- commentary.py window loop: all-or-nothing job (D4). TTS phase reports progress only at 70/90, so JOB_STALE_SECONDS could cut a 30+ min TTS stage.
+- No frontend test runner. VideoPlayer ducking/jitter (F14).
 
 ## 6. Suggested next session
-Session 11 in TASKS.md (N2, N5, N6, N4, N1, N10), decide D4, then session 8 on real footage.
+Decide D4, restart services, run session 8 (real clips, short then 10+ min), throughput experiments, then GIF, LICENSE, tag v0.1.0.

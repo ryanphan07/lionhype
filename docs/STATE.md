@@ -47,6 +47,7 @@ The browser keeps the file as a blob URL for playback; the server never serves v
 - Not covered: real LLM or real edge-tts in CI (both need external services), real `motion_box` on moving-subject video, frontend.
 
 ## Environment
+- Verified 2026-10-28: a brand-new venv from `requirements-dev.txt` passes all tests; a fresh `npm ci` passes lint and build.
 - `backend/requirements.txt` is pinned (includes `websockets`, required by uvicorn for the WS route); `backend/requirements-dev.txt` adds pytest.
 - Windows native, no Docker (Docker files are stale and untested).
 - llama-server at 127.0.0.1:8080 with `--mmproj`. In use now: Qwen3.5-9B Q4_K_M; CLAUDE.md names Qwen3.6-35B-A3B. Decide which one is the demo model.

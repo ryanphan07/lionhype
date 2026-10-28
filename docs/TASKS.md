@@ -7,14 +7,14 @@ Goal: a credible, honest, demoable resume MVP, shipped fast. Items are tagged wi
 2. Models: develop on the 9B, use the 35B-A3B for real runs.
 3. TTS fallback: owner unsure; keep edge-tts + text-only fallback until v0.1.0, then consider an offline provider (D3).
 
-## Session 11: robustness before long clips (SHOULD-FIX, all small, do next)
+## Session 11: robustness before long clips - DONE 2026-10-28 except optional N7
 - [x] N2: `AsyncOpenAI(max_retries=0)`; a window now fails when its own timeout fires (tested: client setting).
 - [x] N5: that test uses `fake_ai`; suite back to about 3 s.
 - [x] N6: `has_active()` fails jobs with no progress update for `JOB_STALE_SECONDS` (1800) so uploads unblock (tested with a fake clock). Note: the TTS phase only reports at 70 and 90 percent, so a very slow TTS stage over 30 min would be cut off; per-clip progress is a possible follow-up.
 - [x] N4: `pipeline.friendly_error` maps failures to safe messages (model unreachable/timeout, unusable model output, video could not be processed, else the generic text); detail stays in the server log (tested). "No usable commentary" is now an `LLMOutputError`.
 - [x] N1 (polling part): after 5 failed WebSocket reconnects `App.jsx` polls `GET /api/jobs/{id}` every 5 s until terminal (gives up after about 5 min of no server, or on 404). Lint and build pass; **not exercised in a browser or by an automated test** (no frontend test runner yet). Not done: resuming after a page refresh (`job_id` in sessionStorage); the blob video is lost on refresh, so it needs a re-select flow. Decide if wanted.
 - [x] N10: a quip that would start at or after the video end is dropped (`schedule_quips(quips, video_duration)`); mp3s of dropped quips are deleted (`tts.remove_clip_file`, tested).
-- [ ] N7 (optional, prompt-level): pass the last 2-3 `seen` summaries to the next window to reduce repetition on long clips.
+- [ ] N7 (optional; needs `analyze_window` to return the `seen` text, so it changes an internal return shape: left for the owner): pass the last 2-3 `seen` summaries to the next window to reduce repetition on long clips.
 
 ## Decision before long-clip testing: D4 (see DECISIONS.md)
 - [ ] Owner: pick the long-job strategy (A keep all-or-nothing, B skip failed windows, C progressive results). Recommendation: B now (small), C after v0.1.0.
@@ -43,13 +43,13 @@ Goal: a credible, honest, demoable resume MVP, shipped fast. Items are tagged wi
 - [x] F4: at startup, delete everything in `uploads/videos` and `uploads/audio` (the in-memory store is empty then). Test with a temp dir.
 - [x] F5 (video deleted right after a successful job): delete the source video as soon as frames are sampled (end of the analyzing phase) or on completion.
 - [x] F6 (409 "Another clip is still being processed"): allow one running job at a time; extra uploads get a clear 409/429 message (or queue). Test.
-- [x] F8: `requirements.txt` pinned to the installed versions, `requirements-dev.txt` added (pytest, anyio), `pytest-asyncio` dropped. Also added `websockets` (F18). Still to do: verify once in a brand-new venv.
+- [x] F8: `requirements.txt` pinned to the installed versions, `requirements-dev.txt` added (pytest, anyio), `pytest-asyncio` dropped. Also added `websockets` (F18). Verified in a brand-new venv on 2026-10-28 (101 tests pass).
 - [ ] F9: delete `docker-compose.yml` and the Dockerfiles, or keep and label "untested, not part of the MVP". Recommendation: delete (ask first).
 - [x] `npm audit fix` (0 vulnerabilities), `.gitignore` `spike_frames/`, deleted `frontend/README.md` boilerplate, removed unused `TTS_PROVIDER`, `LLM_MODEL` default now `local`, `LLM_TEMPERATURE` setting.
 - [x] F11: `vision_spike.py` imports the shared `motion_box`.
 
 ## Session 10: ship (docs and GIF)
-- [ ] README at the repo root (moved to the root 2026-10-28; links still to verify): what it is, GIF, architecture diagram, prerequisites (Python 3.12, Node 20+, llama-server + model + mmproj), 5-command quickstart, route list, config table, known limitations (60 s clips, minutes of processing, needs internet for TTS, single user, no auth), honest "how it was tested".
+- [ ] README polish (it is at the repo root; quickstart verified from a fresh venv and a fresh `npm ci` on 2026-10-28; still needs the GIF and a final read): what it is, GIF, architecture diagram, prerequisites (Python 3.12, Node 20+, llama-server + model + mmproj), 5-command quickstart, route list, config table, known limitations (60 s clips, minutes of processing, needs internet for TTS, single user, no auth), honest "how it was tested".
 - [ ] Add a LICENSE (owner picks: MIT is the usual choice for a portfolio repo). Final pass on STATE/TASKS. Tag `v0.1.0`.
 - [ ] Resume bullet draft (only claims the repo proves): local multimodal LLM windowed analysis with motion-based crop, time-synced TTS with server-side overlap scheduling, WebSocket job progress, 95+ tests.
 
