@@ -76,7 +76,8 @@ async def test_progress_cb_receives_statuses_in_order_with_real_window_messages(
     assert "completed" not in statuses
     assert statuses.index("extracting") < statuses.index("analyzing") < statuses.index("synthesizing")
     analyzing = [e for e in events if e[0] == "analyzing"]
-    assert [e[2] for e in analyzing] == ["Analyzing part 1 of 2", "Analyzing part 2 of 2"]
+    assert analyzing[0][2] == "Analyzing part 1 of 2"
+    assert analyzing[1][2].startswith("Analyzing part 2 of 2")
     assert analyzing[0][1] < analyzing[1][1] < 70
 
 

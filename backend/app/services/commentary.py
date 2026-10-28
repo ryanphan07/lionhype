@@ -32,6 +32,15 @@ def finalize_timeline(quips: List[Dict[str, Any]], duration: float) -> List[Dict
     return kept
 
 
+def analyzing_message(index: int, total: int, avg_window_sec: Optional[float]) -> str:
+    """'Analyzing part i of n', plus a time estimate once one window has been timed."""
+    message = f"Analyzing part {index + 1} of {total}"
+    if avg_window_sec:
+        minutes = avg_window_sec * (total - index) / 60
+        message += ", under a minute left" if minutes < 1 else f", about {round(minutes)} min left"
+    return message
+
+
 def schedule_quips(quips: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Keep spoken quips from overlapping: shift late by up to MAX_SHIFT_SEC, else drop. Quips without audio never block."""
     result: List[Dict[str, Any]] = []
@@ -80,8 +89,10 @@ async def process_video_commentary(
     raw_quips: List[Dict[str, Any]] = []
     previous: List[str] = []
     total_windows = len(windows)
+    analyzing_started = time.monotonic()
     for i, (start, end) in enumerate(windows):
-        await _report("analyzing", 20 + int(45 * i / total_windows), f"Analyzing part {i + 1} of {total_windows}")
+        avg = (time.monotonic() - analyzing_started) / i if i else None
+        await _report("analyzing", 20 + int(45 * i / total_windows), analyzing_message(i, total_windows, avg))
         frames = await asyncio.to_thread(
             video_processor_service.sample_window_frames,
             video_path, start, end, settings.FRAMES_PER_WINDOW, settings.FRAME_WIDTH, box,

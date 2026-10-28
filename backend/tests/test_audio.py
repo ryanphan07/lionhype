@@ -211,3 +211,10 @@ def test_parse_model_json_tolerates_junk(reply, expected):
 def test_parse_model_json_no_object_raises():
     with pytest.raises(llm_module.LLMOutputError):
         llm_module.parse_model_json("no json here")
+
+
+def test_analyzing_message_estimates_time_left():
+    msg = commentary_module.analyzing_message
+    assert msg(0, 6, None) == "Analyzing part 1 of 6"
+    assert msg(1, 6, 45.0) == "Analyzing part 2 of 6, about 4 min left"
+    assert msg(5, 6, 20.0) == "Analyzing part 6 of 6, under a minute left"

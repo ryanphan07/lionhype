@@ -15,7 +15,7 @@ Goal: a credible, honest, demoable resume MVP, shipped fast. Items are tagged wi
 
 ## Session 7b: long clips (owner goal: 10+ minutes) - limits DONE, rest open
 - [x] `MAX_VIDEO_SECONDS` 1800 and `MAX_UPLOAD_MB` 2048 as settings, tested.
-- [ ] Add an ETA to the analyzing message ("part i of n, about m min left") from the running average window time.
+- [x] ETA in the analyzing message ("part i of n, about m min left") from the running average window time (`commentary.analyzing_message`).
 - [ ] Decide failure policy for one bad window in a long job: retry the window, or skip it with a logged gap, instead of failing after 40 minutes (changes the "fail loud" rule: ask first).
 - [ ] Run one 10+ minute clip on the 9B model and record windows, total time, memory, and whether the WebSocket, blob playback and TTS count (about 100+ clips) hold up. Repeat on the 35B-A3B.
 - [ ] Consider reading upload in chunks with early size rejection; large bodies are currently spooled to disk by Starlette before the check.
