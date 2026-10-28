@@ -24,6 +24,7 @@ Goal: a credible, honest, demoable resume MVP, shipped fast. Items are tagged wi
 - [ ] Run 3 real clips (e.g. `hoco2026_7star.mp4`, `shorter_test.mp4`, one more) through the UI. Record per clip: duration, window count, seconds per window, quips kept vs shifted vs dropped, subjective commentary quality.
 - [ ] Check in the browser: progress bar and "Analyzing part i of n", audio starts in sync, no overlap, seek backward and forward, pause/resume, autoplay-blocked notice, error path (stop llama-server mid-job), no-audio path (disconnect network).
 - [ ] Tune prompt, `FRAME_WIDTH`, `FRAMES_PER_WINDOW`, `WINDOW_SECONDS`. Restart after prompt edits (cached).
+- [ ] Re-run the F1-F3 live check (llama-server was down at the end of this session): 10 s clip, confirm no cut lines and fewer drops.
 - [ ] Record the demo GIF (20-30 s clip, sound shown via captions or a short linked mp4).
 
 ## Session 9: hygiene (SHOULD-FIX, small)
@@ -37,13 +38,13 @@ Goal: a credible, honest, demoable resume MVP, shipped fast. Items are tagged wi
 
 ## Session 10: ship (docs and GIF)
 - [ ] README at the repo root (moved to the root 2026-10-28; links still to verify): what it is, GIF, architecture diagram, prerequisites (Python 3.12, Node 20+, llama-server + model + mmproj), 5-command quickstart, route list, config table, known limitations (60 s clips, minutes of processing, needs internet for TTS, single user, no auth), honest "how it was tested".
-- [ ] Add a LICENSE. Final pass on STATE/TASKS. Tag `v0.1.0`.
+- [ ] Add a LICENSE (owner picks: MIT is the usual choice for a portfolio repo). Final pass on STATE/TASKS. Tag `v0.1.0`.
 - [ ] Resume bullet draft (only claims the repo proves): local multimodal LLM windowed analysis with motion-based crop, time-synced TTS with server-side overlap scheduling, WebSocket job progress, 92+ tests.
 
 ## Polish, only if time remains
-- [ ] F14: stop audio when the video ends; do not overwrite a user volume change while ducked; use `requestVideoFrameCallback` or a 100 ms timer for tighter sync.
+- [x] F14 (partly): audio stops when the video ends. Still open: user volume change while ducked is overwritten; `timeupdate` jitter (up to 250 ms).
 - [ ] F13: warn in the UI when the browser cannot play the uploaded format, or restrict to `.mp4`/`.mov`.
-- [ ] F15: rename `test_main.py` to `test_commentary.py`, remove the unused `conftest.py` fixture, add a moving-subject fixture for `motion_box`, add 2-3 Vitest tests for the VideoPlayer queue.
+- [x] F15 (partly): renamed `test_commentary.py`, removed the unused `conftest.py` fixture. Still open: moving-subject fixture for `motion_box`, 2-3 Vitest tests for the VideoPlayer queue.
 - [ ] Show dropped-quip text as "(skipped, overlapped)" instead of silently removing it (changes result shape: ask first).
 
 ## Out of scope (do not start)

@@ -99,11 +99,13 @@ const VideoPlayer = ({ videoUrl, commentaryQuips, processingStatus, audioAvailab
     video.addEventListener('seeking', handleSeeking);
     video.addEventListener('pause', handlePause);
     video.addEventListener('play', handlePlay);
+    video.addEventListener('ended', stopAll);
     return () => {
       video.removeEventListener('timeupdate', handleTimeUpdate);
       video.removeEventListener('seeking', handleSeeking);
       video.removeEventListener('pause', handlePause);
       video.removeEventListener('play', handlePlay);
+      video.removeEventListener('ended', stopAll);
       stopAll();
     };
   }, [commentaryQuips]);

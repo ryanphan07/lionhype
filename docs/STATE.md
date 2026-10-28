@@ -43,7 +43,7 @@ The browser keeps the file as a blob URL for playback; the server never serves v
 - Lint and build pass. No frontend tests. Browser behavior (progress, sync, seek) has not been re-verified since session 6.
 
 ## Tests: 95 passing (`pytest backend/tests -q`)
-- `test_jobs.py` JobStore. `test_api.py` upload, job GET, WebSocket, cleanup, videos not served, validators. `test_main.py` orchestration with LLM/TTS faked (file name is historical). `test_vision.py` crop, windows, frame sampling on real tiny videos, prompt/message building, parser, finalize, window failure. `test_audio.py` TTS success/failure/timeout/no leftover files, mutagen on a hand-built mp3, `schedule_quips`, `audio_available`, parser edge cases.
+- `test_jobs.py` JobStore. `test_api.py` upload, job GET, WebSocket, cleanup, videos not served, validators. `test_commentary.py` orchestration with LLM/TTS faked. `test_vision.py` crop, windows, frame sampling on real tiny videos, prompt/message building, parser, finalize, window failure. `test_audio.py` TTS success/failure/timeout/no leftover files, mutagen on a hand-built mp3, `schedule_quips`, `audio_available`, parser edge cases.
 - Not covered: real LLM or real edge-tts in CI (both need external services), real `motion_box` on moving-subject video, frontend.
 
 ## Environment

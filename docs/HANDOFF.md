@@ -1,30 +1,29 @@
-# Handoff: audit session (2026-10-28)
+# Handoff: sessions 7, 7b, 9 (+ decisions)
+
 ## 1. Done
-- docs/AUDIT.md: replaced with audit 2 (baseline, goal check, live run, findings F1-F17, status of every old finding).
-- docs/STATE.md, docs/TASKS.md, docs/README.md: rewritten to match the code (old ones described removed code and a stale frontend/API).
-- docs/CONVENTIONS.md: model in use, 60 vs 90 s note, timing section, test/verify dates.
-- Environment: upgraded venv edge-tts 7.2.8 -> 7.3.1 via `pip install -r requirements.txt` (real TTS was 403ing).
-- No source code changed.
+- docs/DECISIONS.md (new): D1 long clips (10+ min) are a goal, D2 9B for dev / 35B-A3B for real runs, D3 TTS fallback (deferred; recommendation: edge-tts + text-only until v0.1.0, then offline Piper).
+- commentary.py/config/prompt: no more quip truncation, `MIN_QUIP_GAP_SEC` 4.5, 3 quips/window, 10 words, timestamps rounded; `QUIP_WORDS_PER_SECOND` removed. `analyzing_message` adds a time-left estimate.
+- config/video_processor: `MAX_VIDEO_SECONDS` 1800, `MAX_UPLOAD_MB` 2048 (settings).
+- pipeline/main/jobs: startup sweep of uploads, source video deleted after success, 409 when a job is running.
+- requirements.txt pinned + `websockets` added (fresh installs had no WS library: /ws returned 404); requirements-dev.txt; npm audit fix; LLM_TEMPERATURE; removed TTS_PROVIDER; spike script uses shared motion_box; VideoPlayer stops audio on `ended`; test_main.py renamed test_commentary.py. Docs updated after each change.
 
 ## 2. Decisions and deviations
-- Only docs and the venv were changed; defects are listed in TASKS, not fixed.
-- Did not read uploads/ (rule); its stale contents come from `ls` only. README stays in docs/ (move is a TASKS item). CLAUDE.md not edited (names the 35B; 9B is running).
+- Docker files not deleted (needs your OK). frontend/README.md (Vite boilerplate) deleted.
+- LICENSE not added (your choice). Per-window failure policy for long jobs left open (changes "fail loud").
+- You moved README to the repo root; I edited it there.
 
 ## 3. Results
-- pytest backend/tests -q: 92 passed. npm run lint: clean. npm run build: ok. npm audit: 1 high (follow-redirects, transitive).
-- Live in-process run (real llama-server 9B + real edge-tts, 10 s slideshow of spike frames): ok, 46 s.
+- pytest backend/tests -q: 95 passed. npm run lint clean, build ok, npm audit 0 vulnerabilities.
 
 ## 4. Not verified, needs manual testing
-1. Restart uvicorn (it predates session 6), run a real clip in the browser: progress, sync, seek, pause, error and no-audio paths.
-2. Commentary quality on real motion (this audit used stills).
-3. Fresh-venv install from requirements.txt (not done).
+1. Live re-check of F1-F3: llama-server was down. Restart uvicorn (new code, websockets) and run a clip in the browser.
+2. A 10+ minute clip on 9B, then 35B (time, memory, ~100 TTS clips, ETA text).
+3. Fresh-venv install from requirements.txt and the README quickstart.
 
 ## 5. Open issues and risks
-- commentary.py:35-38 truncates quips mid-sentence (reproduced live).
-- config.py:24-25 and the prompt assume 2.5 words/s; measured 1.8, so lines get shifted or dropped.
-- commentary.py:53-60 float noise in shifted timestamps shows in the UI (VideoPlayer.jsx:150).
-- main.py:25 no startup sweep: backend/uploads holds about 130 MB of orphaned videos and 10-byte fake mp3 dirs.
-- Edge-tts is an unofficial endpoint; demo needs a fallback plan.
+- commentary.py window loop: one failed window fails a possibly 40-minute job; jobs are lost on restart.
+- VideoPlayer.jsx: volume-ducking overwrite, 250 ms timeupdate jitter.
+- docker-compose.yml, Dockerfiles stale. Upload body is spooled before the size check (main.py).
 
 ## 6. Suggested next session
-Session 7 in TASKS.md: fix F1-F3 (remove truncation, recalibrate gap/words/prompt, round timestamps), restart backend, then real-footage runs.
+Session 8 in TASKS.md: real clips in the browser, tune prompt/TTS_RATE (try +20%), record the GIF; then LICENSE and tag v0.1.0.
