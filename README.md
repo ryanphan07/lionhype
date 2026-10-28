@@ -66,7 +66,7 @@ Open http://localhost:5173, choose a clip (`.mp4`, `.mov`, `.avi`; at most 30 mi
 | `TTS_VOICE`, `TTS_RATE`, `TTS_TIMEOUT_SECONDS`, `TTS_CONCURRENCY`, `TTS_ENABLED` | en-US-GuyNeural, +10%, 30, 4, true | Speech |
 | `MAX_SHIFT_SEC` | 2.0 | Largest delay allowed to avoid audio overlap |
 | `MAX_VIDEO_SECONDS`, `MAX_UPLOAD_MB` | 1800, 2048 | Upload limits (guards, not speed promises) |
-| `JOB_TTL_SECONDS`, `CLEANUP_INTERVAL_SECONDS` | 3600, 600 | Job and file expiry |
+| `JOB_TTL_SECONDS`, `JOB_STALE_SECONDS`, `CLEANUP_INTERVAL_SECONDS` | 3600, 1800, 600 | Job expiry; stale-running-job timeout; cleanup interval |
 | `CORS_ORIGINS`, `PUBLIC_BASE_URL`, `LOG_LEVEL` | localhost:5173/3000, http://localhost:8000, INFO | Server |
 
 The system prompt is `backend/app/prompts/commentary_system.txt` (restart the backend after editing).
@@ -74,7 +74,7 @@ The system prompt is `backend/app/prompts/commentary_system.txt` (restart the ba
 ## Tests
 
 ```powershell
-pytest backend/tests -q          # 96 tests: LLM and edge-tts faked, real tiny videos and a real mp3 for the rest
+pytest backend/tests -q          # 97 tests: LLM and edge-tts faked, real tiny videos and a real mp3 for the rest
 cd frontend; npm run lint; npm run build
 ```
 Not covered by automated tests: the real model, the real TTS service, browser playback sync.

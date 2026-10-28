@@ -10,7 +10,7 @@ Goal: a credible, honest, demoable resume MVP, shipped fast. Items are tagged wi
 ## Session 11: robustness before long clips (SHOULD-FIX, all small, do next)
 - [x] N2: `AsyncOpenAI(max_retries=0)`; a window now fails when its own timeout fires (tested: client setting).
 - [x] N5: that test uses `fake_ai`; suite back to about 3 s.
-- [ ] N6: let `has_active()` ignore jobs idle longer than a stale limit (e.g. `JOB_STALE_SECONDS`, default 2x `LLM_TIMEOUT`), marking them failed; test with a fake clock.
+- [x] N6: `has_active()` fails jobs with no progress update for `JOB_STALE_SECONDS` (1800) so uploads unblock (tested with a fake clock). Note: the TTS phase only reports at 70 and 90 percent, so a very slow TTS stage over 30 min would be cut off; per-clip progress is a possible follow-up.
 - [ ] N4: map failures to safe messages ("The AI model is not reachable", "The model returned unusable output", "The video could not be processed"); log the detail server-side; test each category.
 - [ ] N1: frontend: when the WebSocket is lost, fall back to polling `GET /api/jobs/{id}` every 5 s until terminal (no 5-try limit); keep `job_id` in sessionStorage so a refresh can resume status (the video blob needs re-selecting; show that).
 - [ ] N10: clamp shifted timestamps to the video duration; delete the mp3 of a dropped quip.

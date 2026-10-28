@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
 
     JOB_TTL_SECONDS: int = 3600
+    JOB_STALE_SECONDS: int = 1800  # a running job with no progress update for this long is failed so uploads unblock
     CLEANUP_INTERVAL_SECONDS: int = 600
     MAX_VIDEO_SECONDS: float = 1800.0  # guard against accidents; long clips are a goal (docs/DECISIONS.md D1)
     MAX_UPLOAD_MB: int = 2048

@@ -128,6 +128,12 @@ class JobStore:
                 pass
 
     def has_active(self) -> bool:
+        """True if a job is running. A job with no progress update for JOB_STALE_SECONDS is failed first."""
+        now = time.time()
+        for job in list(self._jobs.values()):
+            if job.status not in TERMINAL and now - job.updated_at > settings.JOB_STALE_SECONDS:
+                logger.warning("Job %s made no progress for %ds; marking it failed", job.job_id, settings.JOB_STALE_SECONDS)
+                self.fail(job.job_id, "Processing timed out")
         return any(job.status not in TERMINAL for job in self._jobs.values())
 
     def video_paths(self) -> dict[str, str]:

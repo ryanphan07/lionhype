@@ -3,7 +3,9 @@ import time
 
 import pytest
 
+from app.config import settings
 from app.schemas.events import CommentaryResponse
+from app.services import jobs as jobs_module
 from app.services.jobs import Job, JobNotFoundError, JobStore
 
 
@@ -160,3 +162,12 @@ async def test_timestamps_are_per_instance(store):
     second = store.create("b.mp4", job_id="b")
     assert second.created_at > first.created_at
     assert second.updated_at > first.updated_at
+
+
+def test_stale_running_job_is_failed_and_stops_blocking(store, monkeypatch):
+    job = store.create("video.mp4")
+    store.update(job.job_id, "analyzing", 30)
+    assert store.has_active() is True
+    monkeypatch.setattr(jobs_module.time, "time", lambda: job.updated_at + settings.JOB_STALE_SECONDS + 1)
+    assert store.has_active() is False
+    assert job.status == "error" and job.message == "Processing timed out"
