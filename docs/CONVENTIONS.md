@@ -3,10 +3,10 @@
 ## Project context
 LionHype is a local-first app that turns lion dance videos into humorous, time-synced AI commentary with TTS audio. FastAPI backend (OpenCV frames, OpenAI-compatible multimodal LLM, edge-tts) + React/Vite frontend with WebSocket progress.
 
-Goal: a credible, honest, demoable MVP for a resume (upload a clip of 90s or less; the goal is now long clips, 10+ min: `MAX_VIDEO_SECONDS` 1800 and `MAX_UPLOAD_MB` 2048 are guards, see docs/DECISIONS.md D1, see progress, get commentary with non-overlapping audio, run locally in a few commands). Do not add features beyond `docs/AUDIT.md` and `TASKS.md` without asking.
+Goal: a credible, honest, demoable MVP for a resume: upload a clip, see progress, get commentary with non-overlapping audio, run locally in a few commands. Short clips (up to about 60 s) are the supported demo. Longer clips up to `MAX_VIDEO_SECONDS` (1800) and `MAX_UPLOAD_MB` (2048) are allowed but slow and untested; see docs/DECISIONS.md D1. Do not add features beyond `docs/AUDIT.md` and `TASKS.md` without asking.
 
 ## Environment
-- Windows + PowerShell. Native run; Docker is untested and not part of the MVP.
+- Windows + PowerShell. Native run; there are no Docker files.
 - LLM: llama-server (OpenAI-compatible) at `http://127.0.0.1:8080/v1`, multimodal via `--mmproj`. Configure via `backend/.env` (see `backend/.env.example` for LLM_*, WINDOW_SECONDS, FRAMES_PER_WINDOW, FRAME_WIDTH, MAX_QUIPS_PER_WINDOW, MAX_VIDEO_SECONDS).
 - Model in use on 2026-10-28: Qwen3.5-9B Q4_K_M (CLAUDE.md names Qwen3.6-35B-A3B). Measured: about 45 s per 10 s window.
 - Start it with: `llama-server -m <gguf> --mmproj <mmproj-F16.gguf> -c 32768 -np 1 -ngl 99 --port 8080 --jinja`
@@ -16,7 +16,7 @@ Goal: a credible, honest, demoable MVP for a resume (upload a clip of 90s or les
 
 ## Commands
 (If any of these is wrong, fix this section.)
-Run from the repo root in PowerShell unless noted. Tests (101) verified 2026-10-28; lint and build verified 2026-10-28, `uvicorn` last verified 2026-10-27. edge-tts must be >= 7.3.1 (re-run `pip install -r requirements-dev.txt` after pulling).
+Run from the repo root in PowerShell unless noted. Tests (105) verified 2026-10-28; lint and build verified 2026-10-28, `uvicorn` last verified 2026-10-27. edge-tts must be >= 7.3.1 (re-run `pip install -r requirements-dev.txt` after pulling).
 - Backend setup (once): `cd backend; python -m venv venv; venv\Scripts\Activate.ps1; pip install -r requirements-dev.txt` (runtime deps are in requirements.txt).
 - Backend tests: `pytest backend/tests -q` (works from the repo root or from `backend/`).
 - Backend run: `cd backend; uvicorn app.main:app --port 8000`. `backend/.env` is resolved relative to `config.py`, so the working directory does not matter for `.env`. `CORS_ORIGINS` (JSON list) is configurable there.

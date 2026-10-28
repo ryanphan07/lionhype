@@ -30,3 +30,11 @@ A 10+ minute clip is one job of about 60 windows. Today one failed window fails 
 - B. Skip a failed window after one retry, log it, and tell the user which time ranges have no commentary ("skipped 2 of 60 parts"). Small change; still honest because the gap is reported, not faked. Changes the earlier "a failed window ends the job" rule.
 - C. Progressive results: synthesize each window as it finishes and let the UI show and play commentary while the rest processes. Best UX for long clips; changes the job result API (partial results) and the player. Larger change.
 - Recommendation: B now, C after v0.1.0.
+
+## 2026-10-28 (session 12)
+
+### D4 decision: A
+- Keep all-or-nothing for v0.1.0. Revisit B (skip a failed window after one retry, report the gap) and C (progressive results) after release.
+
+### D5. License
+- MIT, copyright "Ryan Phan 2026" (name taken from the git user; change `LICENSE` if the owner wants another).

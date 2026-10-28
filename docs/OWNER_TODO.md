@@ -2,7 +2,7 @@
 
 Everything Claude Code can do on its own is in `docs/TASKS.md` (session 12 is next). This list is what is blocked on you, in order. Updated 2026-10-28.
 
-## A. Decisions (a sentence each is enough)
+## A. Decisions (1-3 settled in session 12: D4 = A, MIT, Docker files deleted)
 1. **D4, long-job strategy** (`docs/DECISIONS.md`): A keep all-or-nothing, B skip a failed window after one retry and report the gap, C progressive results. Recommendation: B now, C after v0.1.0.
 2. **LICENSE**: pick one (MIT is the usual choice for a portfolio repo) and the name to put on it.
 3. **Docker files** (`docker-compose.yml`, `backend/Dockerfile`, `frontend/Dockerfile`): delete them (recommended: stale, untested, not part of the MVP) or keep and label.
@@ -38,4 +38,4 @@ Give the results (a short table is fine) to the planning chat and to the next Cl
 
 ## E. Housekeeping (optional)
 - Root has `repomix-output.xml` and `.aider.chat.history.md` (ignored by git, large): delete them if you do not need them.
-- `backend/uploads/` is swept at server start; do not point `UPLOAD_DIR` at a folder you care about until session 12 (M1) lands.
+- `backend/uploads/` is swept at server start; the sweep now deletes only `<job id>_*` videos and job-id audio folders (M1).

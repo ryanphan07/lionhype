@@ -19,7 +19,7 @@ The browser keeps the file as a blob URL for playback; the server never serves v
 |---|---|---|
 | `main.py` | FastAPI app, CORS, `POST /api/upload`, `GET /api/jobs/{id}`, `WS /ws/analyze/{job_id}`, audio-only static mount, generic 500 handler, periodic job cleanup | Route tests (LLM/TTS faked); upload and ws exercised by hand in earlier sessions |
 | `config.py` | Single `settings` object, `.env` resolved relative to the file. Full list in `backend/.env.example` | Verified |
-| `services/jobs.py` | In-memory `JobStore`: status/progress monotonic, terminal states sticky, subscriber queues, TTL purge | Verified (12 tests) |
+| `services/jobs.py` | In-memory `JobStore`: status/progress monotonic, terminal states sticky, subscriber queues, TTL purge, pipeline task handles (a stale job's task is cancelled) | Verified (12 tests) |
 | `services/pipeline.py` | Background runner; failure marks job `error` with a generic message and deletes the job's files | Verified |
 | `services/video_processor.py` | Filename sanitizing, extension/size checks, corruption check, duration, `motion_box` / `compute_crop_box`, `plan_windows`, `sample_window_frames` (same crop for all frames, aspect-preserving resize to `FRAME_WIDTH`) | Verified on synthetic video; crop validated on real footage via the spike |
 | `services/llm.py` | `analyze_window`: system prompt + `image_url` parts, `<think>` and fence stripping, first-JSON-object parse (`raw_decode`), one retry with a JSON nudge, token/time logging. No canned fallback: failures raise | Verified live (one window, Qwen3.5-9B, 44.7 s for 6 frames / 3248 prompt tokens) |
@@ -42,14 +42,14 @@ The browser keeps the file as a blob URL for playback; the server never serves v
 - `components/VideoPlayer.jsx`: blob-URL video, quip queue driven by `timeupdate`, one clip at a time, video ducked to 0.3 while a clip plays, stale lines (older than 4 s) skipped, seek resets, pause/resume handled, autoplay-block notice, "audio unavailable" notice, clickable commentary list that seeks.
 - Lint and build pass. No frontend tests. Browser behavior (progress, sync, seek) has not been re-verified since session 6.
 
-## Tests: 101 passing (`pytest backend/tests -q`)
+## Tests: 105 passing (`pytest backend/tests -q`)
 - `test_jobs.py` JobStore. `test_api.py` upload, job GET, WebSocket, cleanup, videos not served, validators. `test_commentary.py` orchestration with LLM/TTS faked. `test_vision.py` crop, windows, frame sampling on real tiny videos, prompt/message building, parser, finalize, window failure. `test_audio.py` TTS success/failure/timeout/no leftover files, mutagen on a hand-built mp3, `schedule_quips`, `audio_available`, parser edge cases.
 - Not covered: real LLM or real edge-tts in CI (both need external services), real `motion_box` on moving-subject video, frontend.
 
 ## Environment
 - Verified 2026-10-28: a brand-new venv from `requirements-dev.txt` passes all tests; a fresh `npm ci` passes lint and build.
 - `backend/requirements.txt` is pinned (includes `websockets`, required by uvicorn for the WS route); `backend/requirements-dev.txt` adds pytest.
-- Windows native, no Docker (Docker files are stale and untested).
+- Windows native, no Docker.
 - llama-server at 127.0.0.1:8080 with `--mmproj`. In use now: Qwen3.5-9B Q4_K_M; CLAUDE.md names Qwen3.6-35B-A3B. Decide which one is the demo model.
 - edge-tts must be >= 7.3.1 (7.2.8 gets 403).
 

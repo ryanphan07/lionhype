@@ -45,7 +45,7 @@ uvicorn app.main:app --port 8000
 # 3. Frontend (another terminal)
 cd frontend; npm install; npm run dev     # http://localhost:5173
 ```
-Open http://localhost:5173, choose a clip (`.mp4`, `.mov`, `.avi`; at most 30 min and 2 GB by default, see `MAX_VIDEO_SECONDS`/`MAX_UPLOAD_MB`), wait for the progress bar, press play. Expect minutes of processing: a 10 s window took about 45 s on a 9B model (measured).
+Open http://localhost:5173, choose a clip (`.mp4`, `.mov`, `.avi`; at most 30 min and 2 GB by default, see `MAX_VIDEO_SECONDS`/`MAX_UPLOAD_MB`), wait for the progress bar, press play. Expect minutes of processing: a 10 s window took about 45 s on a 9B model (measured). Short clips (up to about 60 s) are the supported demo.
 
 ## API
 
@@ -63,7 +63,7 @@ Open http://localhost:5173, choose a clip (`.mp4`, `.mov`, `.avi`; at most 30 mi
 | `LLM_BASE_URL`, `LLM_MODEL`, `LLM_TIMEOUT`, `LLM_MAX_TOKENS`, `LLM_TEMPERATURE`, `LLM_ENABLE_THINKING` | `http://127.0.0.1:8080/v1`, local, 300 s, 500, 0.8, false | LLM endpoint and limits |
 | `WINDOW_SECONDS`, `FRAMES_PER_WINDOW`, `FRAME_WIDTH` | 10, 6, 896 | Vision windowing |
 | `MAX_QUIPS_PER_WINDOW`, `MIN_QUIP_GAP_SEC` | 3, 4.5 | Quip budget (4.5 s is about the speech time of an 8-word line) |
-| `TTS_VOICE`, `TTS_RATE`, `TTS_TIMEOUT_SECONDS`, `TTS_CONCURRENCY`, `TTS_ENABLED` | en-US-GuyNeural, +10%, 30, 4, true | Speech |
+| `TTS_VOICE`, `TTS_RATE`, `TTS_TIMEOUT_SECONDS`, `TTS_CONCURRENCY`, `TTS_RETRIES`, `TTS_RETRY_DELAY_SECONDS`, `TTS_ENABLED` | en-US-GuyNeural, +10%, 30, 4, 1, 1, true | Speech |
 | `MAX_SHIFT_SEC` | 2.0 | Largest delay allowed to avoid audio overlap |
 | `MAX_VIDEO_SECONDS`, `MAX_UPLOAD_MB` | 1800, 2048 | Upload limits (guards, not speed promises) |
 | `JOB_TTL_SECONDS`, `JOB_STALE_SECONDS`, `CLEANUP_INTERVAL_SECONDS` | 3600, 1800, 600 | Job expiry; stale-running-job timeout; cleanup interval |
@@ -74,22 +74,24 @@ The system prompt is `backend/app/prompts/commentary_system.txt` (restart the ba
 ## Tests
 
 ```powershell
-pytest backend/tests -q          # 101 tests: LLM and edge-tts faked, real tiny videos and a real mp3 for the rest
+pytest backend/tests -q          # 105 tests: LLM and edge-tts faked, real tiny videos and a real mp3 for the rest
 cd frontend; npm run lint; npm run build
 ```
 Not covered by automated tests: the real model, the real TTS service, browser playback sync.
 
 ## Troubleshooting
 - Progress stops and the page says "Live updates lost": on Windows, selecting text in the backend console window (QuickEdit) pauses the server until you press Enter. Press Enter, or turn QuickEdit off in the console properties.
+- Job fails with "The AI model rejected the request": llama-server returned an HTTP error (the status is in the backend log); check its console, the model and mmproj files, and `-c`.
 - Job fails with "The AI model is not reachable": start llama-server (see Quickstart) and check `LLM_BASE_URL`.
 - No audio, "audio unavailable" notice: edge-tts needs internet and `edge-tts>=7.3.1`.
 
 ## Known limitations
-- Single user, in-memory jobs, no auth, one job at a time (a second upload gets 409; the LLM server is single-slot). Starting the backend deletes leftover files in `uploads/videos` and `uploads/audio`.
-- Processing is slow on local hardware: about 45 s per 10 s of video on a 9B model, so a 10 minute clip takes roughly 45 minutes. One failed window fails the whole job; jobs are lost on restart.
-- Speech needs internet. If edge-tts is unreachable the app shows the commentary as text with a notice.
+- Single user, in-memory jobs, no auth, one job at a time (a second upload gets 409; the LLM server is single-slot). Starting the backend deletes leftover job files (`<job id>_<name>` videos, `<job id>` audio folders) in `uploads/`; other files there are left alone.
+- Supported demo: short clips up to about 60 s. Longer clips, up to `MAX_VIDEO_SECONDS`, are allowed but slow and untested.
+- Processing is slow on local hardware: about 45 s per 10 s of video on Qwen3.5-9B (measured). One failed window fails the whole job; jobs are lost on restart.
+- Speech needs internet (edge-tts). A transient TTS failure is retried once; if edge-tts stays unreachable the app shows the commentary as text with a notice.
 - `.avi` and some `.mov` files are accepted by the server but may not play in the browser.
-- Docker files in the repo are stale and untested; the app is run natively.
+- Runs natively on Windows only; there are no Docker files.
 
 ## More
 - `docs/BRIEFING.md` project summary for planning, `docs/OWNER_TODO.md` owner checklist, `docs/DECISIONS.md` design decisions, `docs/STATE.md` what is implemented, `docs/TASKS.md` what is next, `docs/AUDIT.md` latest audit, `docs/CONVENTIONS.md` contracts and rules.

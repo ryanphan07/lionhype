@@ -9,12 +9,12 @@ Goal: a credible, honest, demoable resume MVP, shipped fast. Items are tagged wi
 2. Models: develop on the 9B, use the 35B-A3B for real runs.
 3. TTS fallback: owner unsure; keep edge-tts + text-only fallback until v0.1.0, then consider an offline provider (D3).
 
-## Session 12: safety and long-clip hardening (next; small, code-only)
-- [ ] M1: make `sweep_uploads` delete only files this app created: job-id-prefixed videos (`<32 hex>_*`) and 32-hex audio folders; leave everything else. Test that unrelated files in the folders survive.
-- [ ] M2: one TTS retry with a short delay (setting `TTS_RETRIES`, default 1); consider reporting progress per finished clip so the stale-job timer stays honest on long clips. Test with a fake that fails once.
-- [ ] M3: `friendly_error`: HTTP status errors from the LLM server say "The AI model rejected the request" (with the status in the server log only); connection errors and timeouts keep the current text.
-- [ ] M4: when a stale job is failed, cancel its pipeline task (keep a task handle per job) so a hung job cannot keep running in the background.
-- [ ] M5: README troubleshooting: on Windows, clicking in the console window pauses the server (QuickEdit); press Enter, or disable QuickEdit.
+## Session 12: safety and ship prep - DONE 2026-10-28 (live run and release still open)
+- [x] M1: make `sweep_uploads` delete only files this app created: job-id-prefixed videos (`<32 hex>_*`) and 32-hex audio folders; leave everything else. Test that unrelated files in the folders survive.
+- [x] M2: one TTS retry with a short delay (setting `TTS_RETRIES`, default 1); consider reporting progress per finished clip so the stale-job timer stays honest on long clips. Test with a fake that fails once.
+- [x] M3: `friendly_error`: HTTP status errors from the LLM server say "The AI model rejected the request" (with the status in the server log only); connection errors and timeouts keep the current text.
+- [x] M4: when a stale job is failed, cancel its pipeline task (keep a task handle per job) so a hung job cannot keep running in the background.
+- [x] M5: README troubleshooting: on Windows, clicking in the console window pauses the server (QuickEdit); press Enter, or disable QuickEdit.
 
 ## Session 11: robustness before long clips - DONE 2026-10-28 except optional N7
 - [x] N2: `AsyncOpenAI(max_retries=0)`; a window now fails when its own timeout fires (tested: client setting).
@@ -26,7 +26,7 @@ Goal: a credible, honest, demoable resume MVP, shipped fast. Items are tagged wi
 - [ ] N7 (optional; needs `analyze_window` to return the `seen` text, so it changes an internal return shape: left for the owner): pass the last 2-3 `seen` summaries to the next window to reduce repetition on long clips.
 
 ## Decision before long-clip testing: D4 (see DECISIONS.md)
-- [ ] Owner: pick the long-job strategy (A keep all-or-nothing, B skip failed windows, C progressive results). Recommendation: B now (small), C after v0.1.0.
+- [x] Decided 2026-10-28: A (keep all-or-nothing for v0.1.0). Original options: pick the long-job strategy (A keep all-or-nothing, B skip failed windows, C progressive results). Recommendation: B now (small), C after v0.1.0.
 
 ## Session 7: spoken-line timing (BLOCKS-DEMO) - DONE in code 2026-10-28, live re-check pending
 - [x] F1: stop cutting quips mid-sentence. Remove the word truncation in `finalize_timeline` (`commentary.py:35-38`); rely on the prompt limit and `schedule_quips`. Update the tests that assert truncation.
@@ -53,14 +53,14 @@ Goal: a credible, honest, demoable resume MVP, shipped fast. Items are tagged wi
 - [x] F5 (video deleted right after a successful job): delete the source video as soon as frames are sampled (end of the analyzing phase) or on completion.
 - [x] F6 (409 "Another clip is still being processed"): allow one running job at a time; extra uploads get a clear 409/429 message (or queue). Test.
 - [x] F8: `requirements.txt` pinned to the installed versions, `requirements-dev.txt` added (pytest, anyio), `pytest-asyncio` dropped. Also added `websockets` (F18). Verified in a brand-new venv on 2026-10-28 (101 tests pass).
-- [ ] F9: delete `docker-compose.yml` and the Dockerfiles, or keep and label "untested, not part of the MVP". Recommendation: delete (ask first).
+- [x] F9: Docker files deleted in session 12 (owner decision).
 - [x] `npm audit fix` (0 vulnerabilities), `.gitignore` `spike_frames/`, deleted `frontend/README.md` boilerplate, removed unused `TTS_PROVIDER`, `LLM_MODEL` default now `local`, `LLM_TEMPERATURE` setting.
 - [x] F11: `vision_spike.py` imports the shared `motion_box`.
 
 ## Session 10: ship (docs and GIF)
 - [ ] README polish (it is at the repo root; quickstart verified from a fresh venv and a fresh `npm ci` on 2026-10-28; still needs the GIF and a final read): what it is, GIF, architecture diagram, prerequisites (Python 3.12, Node 20+, llama-server + model + mmproj), 5-command quickstart, route list, config table, known limitations (60 s clips, minutes of processing, needs internet for TTS, single user, no auth), honest "how it was tested".
 - [ ] Add a LICENSE (owner picks: MIT is the usual choice for a portfolio repo). Final pass on STATE/TASKS. Tag `v0.1.0`.
-- [ ] Resume bullet draft (only claims the repo proves): local multimodal LLM windowed analysis with motion-based crop, time-synced TTS with server-side overlap scheduling, WebSocket job progress, 95+ tests.
+- [ ] Resume bullet draft (only claims the repo proves): local multimodal LLM windowed analysis with motion-based crop, time-synced TTS with server-side overlap scheduling, WebSocket job progress, 105 tests.
 
 ## Polish, only if time remains
 - [x] F14 (partly): audio stops when the video ends. Still open: user volume change while ducked is overwritten; `timeupdate` jitter (up to 250 ms).
@@ -73,4 +73,4 @@ Goal: a credible, honest, demoable resume MVP, shipped fast. Items are tagged wi
 - [ ] Optional: `llama-server -np 2` with two windows in flight (drops the previous-quips dependency; needs a quality check).
 
 ## Out of scope (do not start)
-Auth, persistence/database, multi-user queue, S3/presigned uploads, Docker, deployment, offline TTS provider, MCP server, timeline analytics dashboard.
+Auth, persistence/database, multi-user queue, S3/presigned uploads, Docker (files removed), deployment, offline TTS provider, MCP server, timeline analytics dashboard.
