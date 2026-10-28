@@ -74,7 +74,7 @@ The system prompt is `backend/app/prompts/commentary_system.txt` (restart the ba
 ## Tests
 
 ```powershell
-pytest backend/tests -q          # 97 tests: LLM and edge-tts faked, real tiny videos and a real mp3 for the rest
+pytest backend/tests -q          # 98 tests: LLM and edge-tts faked, real tiny videos and a real mp3 for the rest
 cd frontend; npm run lint; npm run build
 ```
 Not covered by automated tests: the real model, the real TTS service, browser playback sync.

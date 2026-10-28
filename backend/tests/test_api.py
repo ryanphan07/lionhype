@@ -320,3 +320,17 @@ def test_second_upload_while_a_job_runs_is_rejected(client, upload_dir, video_by
         assert upload(client, video_bytes).status_code in (200, 400)
     finally:
         job_store._jobs.pop("busy", None)
+
+
+def test_friendly_error_categories():
+    import httpx
+    import openai
+    from app.services.llm import LLMOutputError
+    from app.services.pipeline import GENERIC_FAILURE, friendly_error
+
+    req = httpx.Request("POST", "http://x")
+    assert "not reachable" in friendly_error(openai.APIConnectionError(request=req))
+    assert "not reachable" in friendly_error(openai.APITimeoutError(request=req))
+    assert "unusable output" in friendly_error(LLMOutputError("bad json"))
+    assert "video" in friendly_error(ValueError("No frames"))
+    assert friendly_error(RuntimeError("secret")) == GENERIC_FAILURE

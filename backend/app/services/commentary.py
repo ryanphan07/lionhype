@@ -108,7 +108,7 @@ async def process_video_commentary(
 
     normalized_quips = finalize_timeline(raw_quips, duration)
     if not normalized_quips:
-        raise ValueError("The model produced no usable commentary")
+        raise llm_service.LLMOutputError("The model produced no usable commentary")
     logger.info("Timeline: %d quips from %d windows", len(normalized_quips), total_windows)
 
     await _report("synthesizing", 70)

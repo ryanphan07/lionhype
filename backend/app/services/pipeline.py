@@ -5,9 +5,28 @@ from typing import Optional
 
 from app.config import settings
 from app.services.commentary import process_video_commentary
+from app.services.llm import LLMOutputError
 from app.services.jobs import job_store
 
 logger = logging.getLogger("lionhype.pipeline")
+
+
+GENERIC_FAILURE = "Commentary generation failed"
+
+
+def friendly_error(exc: BaseException) -> str:
+    """A safe, user-facing reason for a failed job. Details stay in the server log."""
+    try:
+        import openai
+    except ImportError:  # pragma: no cover
+        openai = None
+    if openai is not None and isinstance(exc, (openai.APIConnectionError, openai.APIStatusError)):
+        return "The AI model is not reachable or timed out. Is llama-server running?"
+    if isinstance(exc, LLMOutputError):
+        return "The AI model returned unusable output. Try again."
+    if isinstance(exc, ValueError):
+        return "The video could not be processed."
+    return GENERIC_FAILURE
 
 
 def cleanup_job_files(job_id: str, video_path: str) -> None:
@@ -56,9 +75,9 @@ async def run_pipeline(job_id: str, video_path: str) -> None:
             os.remove(video_path)  # the browser plays its own copy; nothing reads the source again
         except OSError:
             logger.warning("Could not delete video for job %s", job_id)
-    except Exception:
+    except Exception as exc:
         logger.exception("Commentary generation failed for job %s", job_id)
         try:
-            job_store.fail(job_id, "Commentary generation failed")
+            job_store.fail(job_id, friendly_error(exc))
         finally:
             cleanup_job_files(job_id, video_path)

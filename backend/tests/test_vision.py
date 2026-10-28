@@ -357,7 +357,7 @@ async def test_no_quips_at_all_is_an_error(monkeypatch, two_windows):
         return []
 
     monkeypatch.setattr(llm_module, "analyze_window", empty)
-    with pytest.raises(ValueError, match="no usable commentary"):
+    with pytest.raises(llm_module.LLMOutputError, match="no usable commentary"):
         await commentary_module.process_video_commentary("v.mp4")
 
 
