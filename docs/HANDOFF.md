@@ -8,10 +8,8 @@
 - No source code changed.
 
 ## 2. Decisions and deviations
-- The audit prompt was broad; I only edited docs and the venv. All defects are listed in TASKS, not fixed.
-- Did not read or touch uploads/ (CLAUDE.md rule): its stale contents are reported from `ls` only.
-- Kept README at docs/README.md; moving it to the repo root is a TASKS item.
-- CLAUDE.md not edited (it names the 35B model; the running model is the 9B).
+- Only docs and the venv were changed; defects are listed in TASKS, not fixed.
+- Did not read uploads/ (rule); its stale contents come from `ls` only. README stays in docs/ (move is a TASKS item). CLAUDE.md not edited (names the 35B; 9B is running).
 
 ## 3. Results
 - pytest backend/tests -q: 92 passed. npm run lint: clean. npm run build: ok. npm audit: 1 high (follow-redirects, transitive).
