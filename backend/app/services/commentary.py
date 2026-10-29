@@ -13,6 +13,19 @@ logger = logging.getLogger("maneframe.commentary")
 
 
 AUDIO_GAP_SEC = 0.3
+MAX_CONSECUTIVE_SKIPS = 3
+
+
+def is_unreachable(exc: BaseException) -> bool:
+    """True when the model server cannot be reached at all (refused, DNS, dropped). A timeout is not: the server is
+    there but slow, so that window is retried and skipped like any other failure."""
+    try:
+        import openai
+    except ImportError:  # pragma: no cover
+        openai = None
+    if openai is not None and isinstance(exc, openai.APIConnectionError):
+        return not isinstance(exc, openai.APITimeoutError)
+    return isinstance(exc, ConnectionError)
 
 
 def finalize_timeline(quips: List[Dict[str, Any]], duration: float) -> List[Dict[str, Any]]:
@@ -71,7 +84,7 @@ async def _analyze_with_retry(
     label: str,
 ) -> List[Dict[str, Any]]:
     """Sample and analyze one window. A reply that was not usable JSON was already retried inside analyze_window;
-    any other failure (transport, timeout) gets one more attempt here."""
+    any other failure (timeout, server error) gets one more attempt here. An unreachable server is not retried."""
     for attempt in range(2):
         frames = await asyncio.to_thread(
             video_processor_service.sample_window_frames,
@@ -84,7 +97,7 @@ async def _analyze_with_retry(
         except llm_service.LLMOutputError:
             raise
         except Exception as exc:
-            if attempt:
+            if attempt or is_unreachable(exc):
                 raise
             logger.warning("%s failed (%s: %s); retrying once", label, type(exc).__name__, exc)
     raise AssertionError("unreachable")
@@ -117,7 +130,7 @@ async def process_video_commentary(
     raw_quips: List[Dict[str, Any]] = []
     previous: List[str] = []
     skipped: List[SkippedRange] = []
-    last_failure: Optional[Exception] = None
+    consecutive_skips = 0
     total_windows = len(windows)
     analyzing_started = time.monotonic()
     for i, (start, end) in enumerate(windows):
@@ -127,16 +140,21 @@ async def process_video_commentary(
         try:
             window_quips = await _analyze_with_retry(video_path, start, end, box, previous, label)
         except Exception as exc:
+            if is_unreachable(exc):
+                logger.error("%s: the model server is unreachable; failing the job instead of skipping", label)
+                raise
             logger.exception("%s (%.1fs-%.1fs) failed, skipping it", label, start, end)
             skipped.append(SkippedRange(start=round(start, 2), end=round(end, 2)))
-            last_failure = exc
+            consecutive_skips += 1
+            if consecutive_skips >= MAX_CONSECUTIVE_SKIPS or len(skipped) * 2 > total_windows:
+                logger.error("Giving up after skipping %d of %d windows (%d in a row)", len(skipped), total_windows, consecutive_skips)
+                raise
             continue
+        consecutive_skips = 0
         raw_quips.extend(window_quips)
         if window_quips:
             previous = [q["text"] for q in window_quips[-2:]]
 
-    if len(skipped) == total_windows and last_failure is not None:
-        raise last_failure  # nothing worked: fail the job with the real cause
     if skipped:
         logger.warning("Skipped %d of %d windows: %s", len(skipped), total_windows, [(r.start, r.end) for r in skipped])
 

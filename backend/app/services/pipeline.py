@@ -27,6 +27,8 @@ def friendly_error(exc: BaseException) -> str:
         return "The AI model rejected the request. Check the llama-server window for details."
     if openai is not None and isinstance(exc, openai.APIConnectionError):
         return "The AI model is not reachable or timed out. Is llama-server running?"
+    if isinstance(exc, ConnectionError):
+        return "The AI model is not reachable or timed out. Is llama-server running?"
     if isinstance(exc, LLMOutputError):
         return "The AI model returned unusable output. Try again."
     if isinstance(exc, ValueError):

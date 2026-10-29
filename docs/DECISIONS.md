@@ -51,3 +51,7 @@ A 10+ minute clip is one job of about 60 windows. Today one failed window fails 
 ### LLM_JSON_SCHEMA fallback
 - If the server answers HTTP 400 while `LLM_JSON_SCHEMA` is on (some servers reject `response_format`), that one call is retried once without it and a warning is logged. Other statuses and a second 400 propagate. The setting itself is not changed.
 
+
+### D4 skip limits (2026-10-29, session 21)
+- Skipping must not hide a broken run. The job fails immediately, without retry, when the model server is unreachable (connection refused, DNS, dropped; a timeout is not, since a slow server is retried and skipped like any other failure). It also fails as soon as more than half the windows are skipped, or 3 windows in a row are skipped. The error shown is the category message of the last failure.
+- Constants: `MAX_CONSECUTIVE_SKIPS` in `commentary.py`; the half rule is computed from `total_windows`.

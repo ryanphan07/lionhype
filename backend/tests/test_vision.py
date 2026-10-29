@@ -445,6 +445,92 @@ async def test_every_window_failing_still_raises_and_skips_tts(monkeypatch, two_
     assert tts_calls == []
 
 
+def _set_windows(monkeypatch, count):
+    monkeypatch.setattr(commentary_module.video_processor_service, "get_video_duration", lambda p: count * 10.0)
+
+
+def _fail_windows(monkeypatch, failing, error, calls):
+    async def fake(frames, start, end, previous=None, label=""):
+        index = int(start // 10)
+        calls.append(index)
+        if index in failing:
+            raise error
+        return [q(start + 1.0, f"line {index}")]
+
+    monkeypatch.setattr(llm_module, "analyze_window", fake)
+
+
+@pytest.mark.anyio
+async def test_unreachable_server_fails_the_job_immediately(monkeypatch, two_windows):
+    import httpx
+    import openai
+
+    calls = []
+    refused = openai.APIConnectionError(request=httpx.Request("POST", "http://127.0.0.1:8080/v1/chat/completions"))
+    _fail_windows(monkeypatch, {1}, refused, calls)
+    with pytest.raises(openai.APIConnectionError):
+        await commentary_module.process_video_commentary("v.mp4")
+    assert calls == [0, 1]  # no retry, no skip
+
+
+@pytest.mark.anyio
+async def test_builtin_connection_error_also_fails_immediately(monkeypatch, two_windows):
+    calls = []
+    _fail_windows(monkeypatch, {0}, ConnectionRefusedError("refused"), calls)
+    with pytest.raises(ConnectionRefusedError):
+        await commentary_module.process_video_commentary("v.mp4")
+    assert calls == [0]
+
+
+def test_is_unreachable_distinguishes_timeout_from_refused():
+    import httpx
+    import openai
+
+    request = httpx.Request("POST", "http://x")
+    assert commentary_module.is_unreachable(openai.APIConnectionError(request=request))
+    assert not commentary_module.is_unreachable(openai.APITimeoutError(request=request))
+    assert not commentary_module.is_unreachable(TimeoutError("slow"))
+    assert not commentary_module.is_unreachable(llm_module.LLMOutputError("garbage"))
+
+
+@pytest.mark.anyio
+async def test_more_than_half_skipped_fails_the_job(monkeypatch, two_windows):
+    calls = []
+    _set_windows(monkeypatch, 5)
+    _fail_windows(monkeypatch, {0, 2, 4}, llm_module.LLMOutputError("garbage"), calls)  # never 3 in a row
+    with pytest.raises(llm_module.LLMOutputError):
+        await commentary_module.process_video_commentary("v.mp4")
+    assert calls == [0, 1, 2, 3, 4]
+
+
+@pytest.mark.anyio
+async def test_exactly_half_skipped_still_completes(monkeypatch, two_windows):
+    calls = []
+    _set_windows(monkeypatch, 4)
+    _fail_windows(monkeypatch, {0, 2}, llm_module.LLMOutputError("garbage"), calls)
+    result = await commentary_module.process_video_commentary("v.mp4")
+    assert [(r.start, r.end) for r in result.skipped] == [(0.0, 10.0), (20.0, 30.0)]
+
+
+@pytest.mark.anyio
+async def test_three_skips_in_a_row_fail_the_job_early(monkeypatch, two_windows):
+    calls = []
+    _set_windows(monkeypatch, 10)
+    _fail_windows(monkeypatch, {3, 4, 5}, llm_module.LLMOutputError("garbage"), calls)
+    with pytest.raises(llm_module.LLMOutputError):
+        await commentary_module.process_video_commentary("v.mp4")
+    assert calls == [0, 1, 2, 3, 4, 5]  # stopped at the third, windows 6-9 never run
+
+
+@pytest.mark.anyio
+async def test_a_success_resets_the_consecutive_skip_count(monkeypatch, two_windows):
+    calls = []
+    _set_windows(monkeypatch, 10)
+    _fail_windows(monkeypatch, {1, 2, 4, 5}, llm_module.LLMOutputError("garbage"), calls)
+    result = await commentary_module.process_video_commentary("v.mp4")
+    assert len(result.skipped) == 4 and result.total_windows == 10
+
+
 @pytest.mark.anyio
 async def test_partial_failure_job_completes_with_skipped_count_in_message(monkeypatch, two_windows, tmp_path):
     async def flaky(frames, start, end, previous=None, label=""):
