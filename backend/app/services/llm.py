@@ -86,6 +86,35 @@ def extract_quips(objects: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     raise LLMOutputError("Model JSON has no 'quips' list")
 
 
+def response_format() -> Dict[str, Any]:
+    """JSON schema for the prompt's output: {"seen": str, "quips": [{"t": number, "text": str}]}."""
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "commentary",
+            "strict": True,
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "seen": {"type": "string"},
+                    "quips": {
+                        "type": "array",
+                        "maxItems": settings.MAX_QUIPS_PER_WINDOW,
+                        "items": {
+                            "type": "object",
+                            "properties": {"t": {"type": "number"}, "text": {"type": "string"}},
+                            "required": ["t", "text"],
+                            "additionalProperties": False,
+                        },
+                    },
+                },
+                "required": ["seen", "quips"],
+                "additionalProperties": False,
+            },
+        },
+    }
+
+
 def clean_quips(parsed: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Return [{"timestamp", "text"}] sorted by time, dropping malformed or empty entries."""
     raw = parsed.get("quips")
@@ -133,12 +162,16 @@ def build_messages(
 
 async def _call(messages: List[Dict[str, Any]], frame_count: int, label: str) -> str:
     started = time.monotonic()
+    kwargs: Dict[str, Any] = {}
+    if settings.LLM_JSON_SCHEMA:
+        kwargs["response_format"] = response_format()
     response = await llm_client.chat.completions.create(
         model=settings.LLM_MODEL,
         messages=messages,
         temperature=settings.LLM_TEMPERATURE,
         max_tokens=settings.LLM_MAX_TOKENS,
         extra_body={"chat_template_kwargs": {"enable_thinking": settings.LLM_ENABLE_THINKING}},
+        **kwargs,
     )
     usage = getattr(response, "usage", None)
     logger.info(

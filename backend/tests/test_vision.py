@@ -437,3 +437,17 @@ async def test_total_pipeline_time_is_logged(monkeypatch, two_windows, caplog):
 
 def test_llm_client_does_not_retry_on_its_own():
     assert llm_module.llm_client.max_retries == 0
+
+
+@pytest.mark.anyio
+async def test_json_schema_setting_controls_response_format(monkeypatch, prompt_file):
+    monkeypatch.setattr(settings, "LLM_JSON_SCHEMA", False)
+    client = use_client(monkeypatch, [GOOD, GOOD])
+    await llm_module.analyze_window(FRAMES, 0.0, 3.0)
+    assert "response_format" not in client.calls[0]
+    monkeypatch.setattr(settings, "LLM_JSON_SCHEMA", True)
+    await llm_module.analyze_window(FRAMES, 0.0, 3.0)
+    schema = client.calls[1]["response_format"]["json_schema"]["schema"]
+    assert schema["required"] == ["seen", "quips"]
+    assert schema["properties"]["quips"]["maxItems"] == settings.MAX_QUIPS_PER_WINDOW
+    assert schema["properties"]["quips"]["items"]["required"] == ["t", "text"]

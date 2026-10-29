@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     LLM_TIMEOUT: float = 300.0  # seconds per call; a slow local model needs minutes per window
     LLM_ENABLE_THINKING: bool = False
     LLM_MAX_TOKENS: int = 500
+    LLM_JSON_SCHEMA: bool = False  # send response_format with a JSON schema (constrained output)
     LLM_TEMPERATURE: float = 0.8
 
     WINDOW_SECONDS: float = 10.0
