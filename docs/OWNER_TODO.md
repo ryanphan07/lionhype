@@ -1,6 +1,6 @@
 # Owner to-do (things only you can do)
 
-Everything Claude Code can do on its own is in `docs/TASKS.md` (session 12 is next). This list is what is blocked on you, in order. Updated 2026-10-28.
+Everything Claude Code can do on its own is in `docs/TASKS.md` (v0.1.0 prep is next). This list is what is blocked on you, in order. Updated 2026-10-28 after session 14 (benchmark done: docs/BENCHMARKS.md; items C4 and part of C1 are covered by numbers, not by ear).
 
 ## A. Decisions (1-3 settled in session 12: D4 = A, MIT, Docker files deleted)
 1. **D4, long-job strategy** (`docs/DECISIONS.md`): A keep all-or-nothing, B skip a failed window after one retry and report the gap, C progressive results. Recommendation: B now, C after v0.1.0.

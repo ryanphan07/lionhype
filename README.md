@@ -2,7 +2,7 @@
 
 Upload a short lion dance video and get humorous, time-synced play-by-play commentary, read aloud while the video plays. A local vision LLM watches the footage, edge-tts speaks the lines, and the server schedules them so they never overlap.
 
-Status: working local prototype, not a product. It runs end to end with no fake output: if the model or TTS fails, you see an error or a "no audio" notice, never placeholder content. Demo GIF: not recorded yet.
+Status: working local prototype, not a product. It runs end to end with no fake output: if the model or TTS fails, you see an error or a "no audio" notice, never placeholder content. Demo GIF: see the Demo section (not recorded yet).
 
 ## How it works
 
@@ -45,7 +45,7 @@ uvicorn app.main:app --port 8000
 # 3. Frontend (another terminal)
 cd frontend; npm install; npm run dev     # http://localhost:5173
 ```
-Open http://localhost:5173, choose a clip (`.mp4`, `.mov`, `.avi`; at most 30 min and 2 GB by default, see `MAX_VIDEO_SECONDS`/`MAX_UPLOAD_MB`), wait for the progress bar, press play. Expect minutes of processing: a 10 s window took about 45 s on a 9B model (measured). Short clips (up to about 60 s) are the supported demo.
+Open http://localhost:5173, choose a clip (`.mp4`, `.mov`, `.avi`; at most 30 min and 2 GB by default, see `MAX_VIDEO_SECONDS`/`MAX_UPLOAD_MB`), wait for the progress bar, press play. Expect minutes of processing: on Qwen3.5-9B a 40 s clip took about 5 minutes (see Benchmarks). Short clips are the supported demo; 40 s is the longest clip measured.
 
 ## API
 
@@ -63,7 +63,7 @@ Open http://localhost:5173, choose a clip (`.mp4`, `.mov`, `.avi`; at most 30 mi
 | `LLM_BASE_URL`, `LLM_MODEL`, `LLM_TIMEOUT`, `LLM_MAX_TOKENS`, `LLM_TEMPERATURE`, `LLM_ENABLE_THINKING` | `http://127.0.0.1:8080/v1`, local, 300 s, 500, 0.8, false | LLM endpoint and limits |
 | `WINDOW_SECONDS`, `FRAMES_PER_WINDOW`, `FRAME_WIDTH` | 10, 6, 896 | Vision windowing |
 | `MAX_QUIPS_PER_WINDOW`, `MIN_QUIP_GAP_SEC` | 3, 4.5 | Quip budget (4.5 s is about the speech time of an 8-word line) |
-| `TTS_VOICE`, `TTS_RATE`, `TTS_TIMEOUT_SECONDS`, `TTS_CONCURRENCY`, `TTS_RETRIES`, `TTS_RETRY_DELAY_SECONDS`, `TTS_ENABLED` | en-US-GuyNeural, +10%, 30, 4, 1, 1, true | Speech |
+| `TTS_VOICE`, `TTS_RATE`, `TTS_TIMEOUT_SECONDS`, `TTS_CONCURRENCY`, `TTS_RETRIES`, `TTS_RETRY_DELAY_SECONDS`, `TTS_ENABLED` | en-US-GuyNeural, +10%, 30, 1, 1, 1, true | Speech |
 | `MAX_SHIFT_SEC` | 2.0 | Largest delay allowed to avoid audio overlap |
 | `MAX_VIDEO_SECONDS`, `MAX_UPLOAD_MB` | 1800, 2048 | Upload limits (guards, not speed promises) |
 | `JOB_TTL_SECONDS`, `JOB_STALE_SECONDS`, `CLEANUP_INTERVAL_SECONDS` | 3600, 1800, 600 | Job expiry; stale-running-job timeout; cleanup interval |
@@ -74,10 +74,30 @@ The system prompt is `backend/app/prompts/commentary_system.txt` (restart the ba
 ## Tests
 
 ```powershell
-pytest backend/tests -q          # 112 tests: LLM and edge-tts faked, real tiny videos and a real mp3 for the rest
+pytest backend/tests -q          # 117 tests: LLM and edge-tts faked, real tiny videos and a real mp3 for the rest
 cd frontend; npm run lint; npm run build
 ```
 Not covered by automated tests: the real model, the real TTS service, browser playback sync.
+
+## Benchmarks
+
+Measured with `backend/scripts/benchmark.py` on Windows 11, Qwen3.5-9B Q4_K_M via llama-server, default settings, edge-tts 7.3.1. Full data and environment: `docs/BENCHMARKS.md`.
+
+| Clip | Length | Processing | Quips (with audio) | Spoken | Overlaps | Shifted / dropped / TTS failed |
+|---|---|---|---|---|---|---|
+| shorter_test.mp4, cold | 4.8 s | 124 s | 1 (1) | 4.0 s | 0 | 0 / 0 / 0 |
+| shorter_test.mp4, warm (prompt cache) | 4.8 s | 50 s | 1 (1) | 3.1 s | 0 | 0 / 0 / 0 |
+| hoco_40s.mp4 | 40.2 s | 299 s | 7 (7) | 27.5 s | 0 | 0 / 0 / 0 |
+| hoco2026.MOV | 327 s | rejected (6 GB > 2 GB upload limit) | - | - | - | - |
+
+## Demo
+
+TODO: record `docs/demo.gif` and add it here: `![demo](docs/demo.gif)`. Full video with sound: <VIDEO_URL>
+
+## How it was tested
+- 117 automated tests (LLM and edge-tts faked; real tiny videos and a real mp3), frontend lint and build.
+- One scripted end-to-end run on 3 real clips plus a repeat (table above) against a real llama-server and the real edge-tts service: all 4 accepted jobs finished, with no overlapping audio and no TTS failures in the timeline.
+- Untested: commentary quality (judged by ear and eye only), browser playback sync, seek and pause, clips longer than 40 s, the 35B-A3B model, other machines.
 
 ## Troubleshooting
 - Progress stops and the page says "Live updates lost": on Windows, selecting text in the backend console window (QuickEdit) pauses the server until you press Enter. Press Enter, or turn QuickEdit off in the console properties.
@@ -87,8 +107,8 @@ Not covered by automated tests: the real model, the real TTS service, browser pl
 
 ## Known limitations
 - Single user, in-memory jobs, no auth, one job at a time (a second upload gets 409; the LLM server is single-slot). Starting the backend deletes leftover job files (`<job id>_<name>` videos, `<job id>` audio folders) in `uploads/`; other files there are left alone.
-- Supported demo: short clips up to about 60 s. Longer clips, up to `MAX_VIDEO_SECONDS`, are allowed but slow and untested.
-- Processing is slow on local hardware: about 45 s per 10 s of video on Qwen3.5-9B (measured). One failed window fails the whole job; jobs are lost on restart.
+- Longest clip measured: 40 s (about 5 min of processing). Longer clips, up to `MAX_VIDEO_SECONDS`, are allowed but untested; a 327 s, 6 GB clip was rejected by the default 2 GB upload limit.
+- Processing is slow on local hardware: 40 s of video took 299 s (about 7x real time) on Qwen3.5-9B, 54 s per model call on average. About 1 call in 3 needed a retry because the model's JSON was unusable. One failed window fails the whole job; jobs are lost on restart. The 35B-A3B model is unmeasured.
 - Speech needs internet (edge-tts). A transient TTS failure is retried once; if edge-tts stays unreachable the app shows the commentary as text with a notice.
 - `.avi` and some `.mov` files are accepted by the server but may not play in the browser.
 - Runs natively on Windows only; there are no Docker files.

@@ -1,4 +1,4 @@
-# LionHype tasks (2026-10-28, after audit 4)
+# LionHype tasks (2026-10-28, after session 14)
 
 Owner-only items (decisions, live run, ship steps) are in `docs/OWNER_TODO.md`; the planning chat reads `docs/BRIEFING.md`.
 
@@ -9,68 +9,19 @@ Goal: a credible, honest, demoable resume MVP, shipped fast. Items are tagged wi
 2. Models: develop on the 9B, use the 35B-A3B for real runs.
 3. TTS fallback: owner unsure; keep edge-tts + text-only fallback until v0.1.0, then consider an offline provider (D3).
 
-## Session 12: safety and ship prep - DONE 2026-10-28 (live run and release still open)
-- [x] M1: make `sweep_uploads` delete only files this app created: job-id-prefixed videos (`<32 hex>_*`) and 32-hex audio folders; leave everything else. Test that unrelated files in the folders survive.
-- [x] M2: one TTS retry with a short delay (setting `TTS_RETRIES`, default 1); consider reporting progress per finished clip so the stale-job timer stays honest on long clips. Test with a fake that fails once.
-- [x] M3: `friendly_error`: HTTP status errors from the LLM server say "The AI model rejected the request" (with the status in the server log only); connection errors and timeouts keep the current text.
-- [x] M4: when a stale job is failed, cancel its pipeline task (keep a task handle per job) so a hung job cannot keep running in the background.
-- [x] M5: README troubleshooting: on Windows, clicking in the console window pauses the server (QuickEdit); press Enter, or disable QuickEdit.
+## Done (details in docs/STATE.md, docs/HANDOFF.md, git log)
+Sessions 7, 7b (limits, ETA), 9 (hygiene), 11 (robustness), 12 (safety), 13 (TTS hardening) and 14 (benchmark, docs). Benchmark results are in `docs/BENCHMARKS.md`.
 
-## Session 11: robustness before long clips - DONE 2026-10-28 except optional N7
-- [x] N2: `AsyncOpenAI(max_retries=0)`; a window now fails when its own timeout fires (tested: client setting).
-- [x] N5: that test uses `fake_ai`; suite back to about 3 s.
-- [x] N6: `has_active()` fails jobs with no progress update for `JOB_STALE_SECONDS` (1800) so uploads unblock (tested with a fake clock). Note: the TTS phase only reports at 70 and 90 percent, so a very slow TTS stage over 30 min would be cut off; per-clip progress is a possible follow-up.
-- [x] N4: `pipeline.friendly_error` maps failures to safe messages (model unreachable/timeout, unusable model output, video could not be processed, else the generic text); detail stays in the server log (tested). "No usable commentary" is now an `LLMOutputError`.
-- [x] N1 (polling part): after 5 failed WebSocket reconnects `App.jsx` polls `GET /api/jobs/{id}` every 5 s until terminal (gives up after about 5 min of no server, or on 404). Lint and build pass; **not exercised in a browser or by an automated test** (no frontend test runner yet). Not done: resuming after a page refresh (`job_id` in sessionStorage); the blob video is lost on refresh, so it needs a re-select flow. Decide if wanted.
-- [x] N10: a quip that would start at or after the video end is dropped (`schedule_quips(quips, video_duration)`); mp3s of dropped quips are deleted (`tts.remove_clip_file`, tested).
-- [ ] N7 (optional; needs `analyze_window` to return the `seen` text, so it changes an internal return shape: left for the owner): pass the last 2-3 `seen` summaries to the next window to reduce repetition on long clips.
+## Before v0.1.0 (owner: see docs/OWNER_TODO.md)
+- [ ] Listen to and watch the commentary in the browser (sync, no overlap, seek, pause, error and no-audio paths).
+- [ ] Record `docs/demo.gif` and a linked video; replace the TODO and `<VIDEO_URL>` in the README Demo section.
+- [ ] Tag `v0.1.0` (the owner pushes). Resume bullet: local multimodal LLM windowed analysis with motion-based crop, time-synced TTS with server-side overlap scheduling, WebSocket job progress, 117 tests, measured 7x real time on a 9B model.
 
-## Decision before long-clip testing: D4 (see DECISIONS.md)
-- [x] Decided 2026-10-28: A (keep all-or-nothing for v0.1.0). Original options: pick the long-job strategy (A keep all-or-nothing, B skip failed windows, C progressive results). Recommendation: B now (small), C after v0.1.0.
-
-## Session 7: spoken-line timing (BLOCKS-DEMO) - DONE in code 2026-10-28, live re-check pending
-- [x] F1: stop cutting quips mid-sentence. Remove the word truncation in `finalize_timeline` (`commentary.py:35-38`); rely on the prompt limit and `schedule_quips`. Update the tests that assert truncation.
-- [x] F2 (gap 4.5, 3 quips per window, 10 words; `QUIP_WORDS_PER_SECOND` removed; `TTS_RATE` left at +10%, try +20% by ear): recalibrate with measured speech (8 words = 4.5 s, about 1.8 words/s). Suggested: `MIN_QUIP_GAP_SEC` 4.5, `QUIP_WORDS_PER_SECOND` 1.8 (if still used), `MAX_QUIPS_PER_WINDOW` 3, prompt "at most 10 words" and "at least 4.5 seconds apart". Consider `TTS_RATE=+20%`. Check by ear that +20% is still pleasant.
-- [x] F3: round timestamps to 2 decimals after shifting (`schedule_quips`), round for display in VideoPlayer.
-- [ ] Restart uvicorn (running process predates session 6 and the edge-tts upgrade).
-
-## Session 7b: long clips (owner goal: 10+ minutes) - limits DONE, rest open
-- [x] `MAX_VIDEO_SECONDS` 1800 and `MAX_UPLOAD_MB` 2048 as settings, tested.
-- [x] ETA in the analyzing message ("part i of n, about m min left") from the running average window time (`commentary.analyzing_message`).
-- [ ] Decide failure policy for one bad window in a long job: retry the window, or skip it with a logged gap, instead of failing after 40 minutes (changes the "fail loud" rule: ask first).
-- [ ] After session 11 and D4: run one 10+ minute clip on the 9B model and record windows, total time, memory, and whether the WebSocket, blob playback and TTS count (about 100+ clips) hold up. Repeat on the 35B-A3B.
-- [ ] Consider reading upload in chunks with early size rejection; large bodies are currently spooled to disk by Starlette before the check.
-
-## Session 8: real footage, in the browser (BLOCKS-DEMO)
-- [ ] Run 3 real clips (e.g. `hoco2026_7star.mp4`, `shorter_test.mp4`, one more) through the UI. Record per clip: duration, window count, seconds per window, quips kept vs shifted vs dropped, subjective commentary quality.
-- [ ] Check in the browser: progress bar and "Analyzing part i of n", audio starts in sync, no overlap, seek backward and forward, pause/resume, autoplay-blocked notice, error path (stop llama-server mid-job), no-audio path (disconnect network).
-- [ ] Tune prompt, `FRAME_WIDTH`, `FRAMES_PER_WINDOW`, `WINDOW_SECONDS`. Restart after prompt edits (cached).
-- [ ] Re-run the F1-F3 live check (llama-server was down at the end of this session): 10 s clip, confirm no cut lines and fewer drops.
-- [ ] Record the demo GIF (20-30 s clip, sound shown via captions or a short linked mp4).
-
-## Session 9: hygiene (SHOULD-FIX, small)
-- [x] F4: at startup, delete everything in `uploads/videos` and `uploads/audio` (the in-memory store is empty then). Test with a temp dir.
-- [x] F5 (video deleted right after a successful job): delete the source video as soon as frames are sampled (end of the analyzing phase) or on completion.
-- [x] F6 (409 "Another clip is still being processed"): allow one running job at a time; extra uploads get a clear 409/429 message (or queue). Test.
-- [x] F8: `requirements.txt` pinned to the installed versions, `requirements-dev.txt` added (pytest, anyio), `pytest-asyncio` dropped. Also added `websockets` (F18). Verified in a brand-new venv on 2026-10-28 (101 tests pass).
-- [x] F9: Docker files deleted in session 12 (owner decision).
-- [x] `npm audit fix` (0 vulnerabilities), `.gitignore` `spike_frames/`, deleted `frontend/README.md` boilerplate, removed unused `TTS_PROVIDER`, `LLM_MODEL` default now `local`, `LLM_TEMPERATURE` setting.
-- [x] F11: `vision_spike.py` imports the shared `motion_box`.
-
-## Session 10: ship (docs and GIF)
-- [ ] README polish (it is at the repo root; quickstart verified from a fresh venv and a fresh `npm ci` on 2026-10-28; still needs the GIF and a final read): what it is, GIF, architecture diagram, prerequisites (Python 3.12, Node 20+, llama-server + model + mmproj), 5-command quickstart, route list, config table, known limitations (60 s clips, minutes of processing, needs internet for TTS, single user, no auth), honest "how it was tested".
-- [ ] Add a LICENSE (owner picks: MIT is the usual choice for a portfolio repo). Final pass on STATE/TASKS. Tag `v0.1.0`.
-- [ ] Resume bullet draft (only claims the repo proves): local multimodal LLM windowed analysis with motion-based crop, time-synced TTS with server-side overlap scheduling, WebSocket job progress, 112 tests.
-
-## Polish, only if time remains
-- [x] F14 (partly): audio stops when the video ends. Still open: user volume change while ducked is overwritten; `timeupdate` jitter (up to 250 ms).
-- [ ] F13: warn in the UI when the browser cannot play the uploaded format, or restrict to `.mp4`/`.mov`.
-- [x] F15 (partly): renamed `test_commentary.py`, removed the unused `conftest.py` fixture. Still open: moving-subject fixture for `motion_box`, 2-3 Vitest tests for the VideoPlayer queue.
-- [ ] Show dropped-quip text as "(skipped, overlapped)" instead of silently removing it (changes result shape: ask first).
-
-## Throughput experiments for long clips (N8, measure before choosing)
-- [ ] On one 60 s clip, record seconds per window for: baseline; `FRAME_WIDTH` 640; `FRAMES_PER_WINDOW` 4; `WINDOW_SECONDS` 20; each on the 9B and the 35B-A3B. Pick defaults for the 35B from the numbers.
-- [ ] Optional: `llama-server -np 2` with two windows in flight (drops the previous-quips dependency; needs a quality check).
+## After v0.1.0 (do not start before; ask first)
+- Unusable-JSON retries (about 1 call in 3 in the benchmark): the model emits `{"seen"...}` then a second object; fixing the parser or prompt would cut about 50 s per hit.
+- Long clips (owner goal, 10+ min): D4 failure policy B/C, one 10+ minute run, upload chunking/early size rejection, `seen` summaries across windows (N7).
+- Throughput experiments (N8): `FRAME_WIDTH` 640, `FRAMES_PER_WINDOW` 4, `WINDOW_SECONDS` 20 on 9B and 35B-A3B; optional `-np 2`.
+- Polish: warn when the browser cannot play the format (F13), volume change while ducked, 2-3 Vitest tests for the VideoPlayer queue, show dropped quips as skipped.
 
 ## Out of scope (do not start)
 Auth, persistence/database, multi-user queue, S3/presigned uploads, Docker (files removed), deployment, offline TTS provider, MCP server, timeline analytics dashboard.
