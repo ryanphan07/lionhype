@@ -1,7 +1,5 @@
 # Maneframe: AI lion dance commentator
 
-Formerly LionHype.
-
 Upload a short lion dance video and get humorous, time-synced play-by-play commentary, read aloud while the video plays. A local vision LLM watches the footage, edge-tts speaks the lines, and the server schedules them so they never overlap.
 
 Status: v0.1.0, a working local prototype, not a product. It runs end to end with no fake output: if the model or TTS fails, you see an error or a "no audio" notice, never placeholder content.
