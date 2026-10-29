@@ -10,7 +10,13 @@ class CommentaryQuip(BaseModel):
     audio_url: Optional[str] = None
     duration_sec: Optional[float] = None
 
+class SkippedRange(BaseModel):
+    start: float
+    end: float
+
 class CommentaryResponse(BaseModel):
     quips: List[CommentaryQuip]
+    skipped: List[SkippedRange] = []
+    total_windows: int = 0
     video_url: Optional[str] = None
     audio_available: bool = False

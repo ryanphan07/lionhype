@@ -4,7 +4,7 @@ import time
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
 from app.config import settings
-from app.schemas.events import CommentaryQuip, CommentaryResponse
+from app.schemas.events import CommentaryQuip, CommentaryResponse, SkippedRange
 from app.services import llm as llm_service
 from app.services import tts as tts_service
 from app.services import video_processor as video_processor_service
@@ -62,6 +62,34 @@ def schedule_quips(quips: List[Dict[str, Any]], video_duration: Optional[float] 
     return result
 
 
+async def _analyze_with_retry(
+    video_path: str,
+    start: float,
+    end: float,
+    box: Any,
+    previous: List[str],
+    label: str,
+) -> List[Dict[str, Any]]:
+    """Sample and analyze one window. A reply that was not usable JSON was already retried inside analyze_window;
+    any other failure (transport, timeout) gets one more attempt here."""
+    for attempt in range(2):
+        frames = await asyncio.to_thread(
+            video_processor_service.sample_window_frames,
+            video_path, start, end, settings.FRAMES_PER_WINDOW, settings.FRAME_WIDTH, box,
+        )
+        if not frames:
+            raise ValueError(f"No frames could be extracted for {label}")
+        try:
+            return await llm_service.analyze_window(frames, start, end, previous, label=label)
+        except llm_service.LLMOutputError:
+            raise
+        except Exception as exc:
+            if attempt:
+                raise
+            logger.warning("%s failed (%s: %s); retrying once", label, type(exc).__name__, exc)
+    raise AssertionError("unreachable")
+
+
 async def process_video_commentary(
     video_path: str,
     job_id: Optional[str] = None,
@@ -88,23 +116,29 @@ async def process_video_commentary(
 
     raw_quips: List[Dict[str, Any]] = []
     previous: List[str] = []
+    skipped: List[SkippedRange] = []
+    last_failure: Optional[Exception] = None
     total_windows = len(windows)
     analyzing_started = time.monotonic()
     for i, (start, end) in enumerate(windows):
         avg = (time.monotonic() - analyzing_started) / i if i else None
         await _report("analyzing", 20 + int(45 * i / total_windows), analyzing_message(i, total_windows, avg))
-        frames = await asyncio.to_thread(
-            video_processor_service.sample_window_frames,
-            video_path, start, end, settings.FRAMES_PER_WINDOW, settings.FRAME_WIDTH, box,
-        )
-        if not frames:
-            raise ValueError(f"No frames could be extracted for window {i + 1} of {total_windows}")
-        window_quips = await llm_service.analyze_window(
-            frames, start, end, previous, label=f"window {i + 1}/{total_windows}"
-        )
+        label = f"window {i + 1}/{total_windows}"
+        try:
+            window_quips = await _analyze_with_retry(video_path, start, end, box, previous, label)
+        except Exception as exc:
+            logger.exception("%s (%.1fs-%.1fs) failed, skipping it", label, start, end)
+            skipped.append(SkippedRange(start=round(start, 2), end=round(end, 2)))
+            last_failure = exc
+            continue
         raw_quips.extend(window_quips)
         if window_quips:
             previous = [q["text"] for q in window_quips[-2:]]
+
+    if len(skipped) == total_windows and last_failure is not None:
+        raise last_failure  # nothing worked: fail the job with the real cause
+    if skipped:
+        logger.warning("Skipped %d of %d windows: %s", len(skipped), total_windows, [(r.start, r.end) for r in skipped])
 
     normalized_quips = finalize_timeline(raw_quips, duration)
     if not normalized_quips:
@@ -164,5 +198,8 @@ async def process_video_commentary(
 
     logger.info("Pipeline for %s finished in %.1fs", video_id, time.monotonic() - started)
     return CommentaryResponse(
-        quips=[CommentaryQuip(**q) for q in scheduled], audio_available=audio_available
+        quips=[CommentaryQuip(**q) for q in scheduled],
+        skipped=skipped,
+        total_windows=total_windows,
+        audio_available=audio_available,
     )

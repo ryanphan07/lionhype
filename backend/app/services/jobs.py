@@ -104,6 +104,8 @@ class JobStore:
         if job.status not in TERMINAL:
             job.result = result
             message = "Commentary ready" if result.audio_available else "Commentary ready (audio unavailable)"
+            if result.skipped:
+                message += f", skipped {len(result.skipped)} of {result.total_windows} parts"
             self.update(job_id, "completed", 100, message)
 
     def fail(self, job_id: str, message: str):

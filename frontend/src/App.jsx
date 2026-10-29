@@ -29,6 +29,7 @@ const errorDetail = (error, fallback) => {
 function App() {
   const [commentaryQuips, setCommentaryQuips] = useState([]);
   const [audioAvailable, setAudioAvailable] = useState(true);
+  const [skipped, setSkipped] = useState({ ranges: [], total: 0 });
   const [videoUrl, setVideoUrl] = useState(null);
   const [processingStatus, setProcessingStatus] = useState('idle');
   const [progress, setProgress] = useState(0);
@@ -71,6 +72,10 @@ function App() {
       if (jobIdRef.current !== jobId) return;
       setCommentaryQuips(Array.isArray(data.result?.quips) ? data.result.quips : []);
       setAudioAvailable(data.result?.audio_available !== false);
+      setSkipped({
+        ranges: Array.isArray(data.result?.skipped) ? data.result.skipped : [],
+        total: data.result?.total_windows || 0,
+      });
       setProcessingStatus('completed');
       setProgress(100);
     } catch (error) {
@@ -182,6 +187,7 @@ function App() {
     attemptsRef.current = 0;
     setCommentaryQuips([]);
     setAudioAvailable(true);
+    setSkipped({ ranges: [], total: 0 });
     setErrorMessage('');
     setStatusMessage('');
     setProgress(0);
@@ -257,6 +263,7 @@ function App() {
               videoUrl={videoUrl}
               commentaryQuips={commentaryQuips}
               audioAvailable={audioAvailable}
+              skipped={skipped}
               processingStatus={processingStatus}
             />
           </div>

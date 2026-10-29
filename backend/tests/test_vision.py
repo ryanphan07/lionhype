@@ -375,23 +375,93 @@ async def test_merge_enforces_gap_across_windows_and_passes_last_two_quips(monke
 
 
 @pytest.mark.anyio
-async def test_window_failure_raises_and_skips_tts(monkeypatch, two_windows):
+async def test_failed_window_is_skipped_and_reported(monkeypatch, two_windows, caplog):
+    calls = []
+
+    async def flaky(frames, start, end, previous=None, label=""):
+        calls.append(start)
+        if start > 0:
+            raise llm_module.LLMOutputError("window 2 gave garbage")
+        return [q(1.0, "one")]
+
+    monkeypatch.setattr(llm_module, "analyze_window", flaky)
+    with caplog.at_level(logging.WARNING, logger="maneframe.commentary"):
+        result = await commentary_module.process_video_commentary("v.mp4")
+
+    assert [x.text for x in result.quips] == ["one"] and result.quips[0].audio_url
+    assert [(r.start, r.end) for r in result.skipped] == [(10.0, 20.0)]
+    assert result.total_windows == 2
+    assert calls == [0.0, 10.0]  # LLMOutputError was already retried inside analyze_window
+    assert "Skipped 1 of 2 windows" in caplog.text
+
+
+@pytest.mark.anyio
+async def test_transport_failure_gets_one_retry_then_succeeds(monkeypatch, two_windows):
+    calls = []
+
+    async def flaky(frames, start, end, previous=None, label=""):
+        calls.append(start)
+        if start > 0 and calls.count(start) == 1:
+            raise TimeoutError("slow")
+        return [q(start + 1.0, f"line {int(start)}")]
+
+    monkeypatch.setattr(llm_module, "analyze_window", flaky)
+    result = await commentary_module.process_video_commentary("v.mp4")
+    assert calls == [0.0, 10.0, 10.0]
+    assert result.skipped == [] and len(result.quips) == 2
+
+
+@pytest.mark.anyio
+async def test_transport_failure_twice_skips_window(monkeypatch, two_windows):
+    calls = []
+
+    async def flaky(frames, start, end, previous=None, label=""):
+        calls.append(start)
+        if start > 0:
+            raise TimeoutError("slow")
+        return [q(1.0, "one")]
+
+    monkeypatch.setattr(llm_module, "analyze_window", flaky)
+    result = await commentary_module.process_video_commentary("v.mp4")
+    assert calls == [0.0, 10.0, 10.0]
+    assert [(r.start, r.end) for r in result.skipped] == [(10.0, 20.0)]
+
+
+@pytest.mark.anyio
+async def test_every_window_failing_still_raises_and_skips_tts(monkeypatch, two_windows):
     tts_calls = []
 
     async def spy_tts(quip, video_id=None):
         tts_calls.append(quip)
         return {**quip, "audio_url": None}
 
-    async def flaky(frames, start, end, previous=None, label=""):
-        if start > 0:
-            raise llm_module.LLMOutputError("window 2 gave garbage")
-        return [q(1.0, "one")]
+    async def always_garbage(frames, start, end, previous=None, label=""):
+        raise llm_module.LLMOutputError(f"{label} gave garbage")
 
     monkeypatch.setattr(tts_module, "generate_audio_clip", spy_tts)
-    monkeypatch.setattr(llm_module, "analyze_window", flaky)
+    monkeypatch.setattr(llm_module, "analyze_window", always_garbage)
     with pytest.raises(llm_module.LLMOutputError):
         await commentary_module.process_video_commentary("v.mp4")
     assert tts_calls == []
+
+
+@pytest.mark.anyio
+async def test_partial_failure_job_completes_with_skipped_count_in_message(monkeypatch, two_windows, tmp_path):
+    async def flaky(frames, start, end, previous=None, label=""):
+        if start > 0:
+            raise llm_module.LLMOutputError("garbage")
+        return [q(1.0, "one")]
+
+    monkeypatch.setattr(llm_module, "analyze_window", flaky)
+    video = tmp_path / "v.avi"
+    video.write_bytes(b"x")
+    job_store.create(str(video), job_id="partial")
+    await pipeline_module.run_pipeline("partial", str(video))
+
+    job = job_store.get("partial")
+    assert job.status == "completed"
+    assert job.message == "Commentary ready, skipped 1 of 2 parts"
+    assert job.result.skipped[0].start == 10.0
 
 
 @pytest.mark.anyio

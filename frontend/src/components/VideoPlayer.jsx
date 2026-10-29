@@ -3,7 +3,9 @@ import { useEffect, useRef, useState } from 'react';
 const STALE_SECONDS = 4;
 const DUCKED_VOLUME = 0.3;
 
-const VideoPlayer = ({ videoUrl, commentaryQuips, processingStatus, audioAvailable = true }) => {
+const formatTime = (sec) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+
+const VideoPlayer = ({ videoUrl, commentaryQuips, processingStatus, audioAvailable = true, skipped = { ranges: [], total: 0 } }) => {
   const videoRef = useRef(null);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [audioBlocked, setAudioBlocked] = useState(false);
@@ -129,6 +131,13 @@ const VideoPlayer = ({ videoUrl, commentaryQuips, processingStatus, audioAvailab
       {isCompleted && !audioAvailable && (
         <p role="status" style={{ color: '#8a6d00' }}>
           Audio is unavailable for this clip. Commentary is shown as text only.
+        </p>
+      )}
+
+      {isCompleted && skipped.ranges.length > 0 && (
+        <p role="status" style={{ color: '#8a6d00' }}>
+          Skipped {skipped.ranges.length} of {skipped.total} parts because the model failed on them
+          ({skipped.ranges.map((r) => `${formatTime(r.start)}-${formatTime(r.end)}`).join(', ')}). Those parts have no commentary.
         </p>
       )}
 
