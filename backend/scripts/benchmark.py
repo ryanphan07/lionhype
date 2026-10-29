@@ -139,7 +139,7 @@ def format_row(r: Dict[str, Any]) -> List[str]:
 TABLE_HEADER = [
     "Run", "Clip (length / size)", "Total s", "Extract / analyze / synth s", "Final status",
     "Quips (total / audio / no audio)", "Spoken s", "Audio overlaps",
-    "LLM windows / avg s / max s", "Avg prompt / completion tokens", "Shifting / Dropping / TTS failed",
+    "LLM calls (incl. retries) / avg s / max s", "Avg prompt / completion tokens", "Shifting / Dropping / TTS failed",
 ]
 
 
