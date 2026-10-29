@@ -57,10 +57,13 @@ The browser keeps the file as a blob URL for playback; the server never serves v
 The pipeline handles long clips by limits only. Not yet robust: all-or-nothing results (D4), no resume after a page refresh. (SDK retries, the stuck lock and generic errors were fixed in session 11.) See TASKS session 11 and DECISIONS D4.
 
 ## Verified live (2026-10-28, session 14; numbers in docs/BENCHMARKS.md)
-Full pipeline over HTTP on Qwen3.5-9B with real edge-tts: 4 of 4 accepted jobs completed (4.8 s clip cold and warm, 40.2 s clip in 299 s), no audio overlap, no TTS failures, no shifts or drops. Found: about 1 in 3 model calls returned unusable JSON and was retried (addressed in session 15; full-job re-run pending); a 6 GB clip is rejected by the 2 GB cap. `backend/scripts/benchmark.py` reproduces this. Browser behavior and audio quality still not checked.
+Full pipeline over HTTP on Qwen3.5-9B with real edge-tts: 4 of 4 accepted jobs completed (4.8 s clip cold and warm, 40.2 s clip in 299 s), no audio overlap, no TTS failures, no shifts or drops. Found: about 1 in 3 model calls returned unusable JSON and was retried (addressed in session 15, confirmed by the session 16 re-run (0 retries)); a 6 GB clip is rejected by the 2 GB cap. `backend/scripts/benchmark.py` reproduces this. Browser behavior and audio quality still not checked.
 
 ## Verified on a live server (2026-10-28, audit 4)
 With the LLM stopped: upload accepted, job fails in about 4 s with the categorized message over both WebSocket and GET, source video deleted, next upload accepted. Everything LLM-, TTS-timing- or browser-related is still as last verified in sessions 5-6.
 
 ## Maturity
-Local-first prototype that runs end to end with no fake output. Not hardened: single in-memory job store, no auth, no queue, unpinned dependencies, one unofficial TTS endpoint. Honest and demoable once the README/GIF exist and real-footage runs are done (timing defects F1-F3 are fixed in code, not yet re-run live).
+Local-first prototype that runs end to end with no fake output. Not hardened: single in-memory job store, no auth, no queue, one unofficial TTS endpoint (dependencies are pinned). Demoable: real-footage runs and the browser check are done (2026-10-28); the demo GIF/video is pending.
+
+## Verified in the browser and re-benchmarked (2026-10-28, session 16)
+Owner checked browser playback (sync, seek, pause) on hoco_40s.mp4 with the session 15 fix: no problems seen. Benchmark with `LLM_JSON_SCHEMA=true`: 40.2 s clip in 251 s (6 quips, 22.8 s spoken, 4 calls, 0 retries), 4.8 s clip in 66 s; about 6x real time on the 9B (docs/BENCHMARKS.md).

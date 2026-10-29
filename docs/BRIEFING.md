@@ -14,10 +14,11 @@ LionHype turns a lion dance video into humorous, time-synced AI commentary with 
 
 ## State (2026-10-28)
 - Implemented and tested (130 backend tests, fresh venv and `npm ci` verified, lint and build clean, 0 npm vulnerabilities): upload validation, job API (`POST /api/upload`, `GET /api/jobs/{id}`, `WS /ws/analyze/{id}`), windowed vision pipeline, TTS with measured durations, server-side overlap scheduling, categorized safe error messages, stale-job lock, startup upload sweep, polling fallback in the browser, time-left estimate.
-- Verified live (session 14, docs/BENCHMARKS.md): 3 accepted real jobs completed on the 9B with no audio overlap and no TTS failures; a 40 s clip took 299 s (7 quips, 27.5 s spoken); about 3000 prompt tokens per call; real edge-tts works with edge-tts 7.3.1. Verified on a real server with the LLM down: the job fails in about 4 s with a clear message.
-- **Not verified:** browser behavior (progress, sync, seek, pause, polling), listening to the commentary and audio, any run over 40 s, 35B throughput.
-- **Session 14 findings (docs/BENCHMARKS.md):** about 1 in 3 model calls returned unusable JSON (two objects), addressed in session 15, full-job re-run pending (tolerant parser + `LLM_JSON_SCHEMA`; live: valid quips in 3 of 3 calls, 41.2 s cold and 12.5 s warm vs 54 s baseline); the 12 s extracting-to-analyzing step is unexplained; the 6 GB test clip is over the 2 GB upload cap.
-- Measured cost: about 7x real time on the 9B (40 s clip = 299 s). The 327 s test clip was 6 GB and hit the 2 GB upload limit. 10-minute runs untested.
+- Verified live (session 16, docs/BENCHMARKS.md): real jobs completed on the 9B with no audio overlap, no TTS failures and 0 JSON retries; a 40 s clip took 251 s (6 quips, 22.8 s spoken); about 3000 prompt tokens per call; real edge-tts works with edge-tts 7.3.1. Verified on a real server with the LLM down: the job fails in about 4 s with a clear message.
+- Browser playback (sync, seek, pause) checked by the owner 2026-10-28: no problems.
+- **Not verified:** the polling fallback, listening to the commentary and audio, any run over 40 s, 35B throughput.
+- **Session 14 findings (docs/BENCHMARKS.md):** about 1 in 3 model calls returned unusable JSON (two objects), addressed in session 15 and confirmed in session 16 (0 retries) (tolerant parser + `LLM_JSON_SCHEMA`; live: valid quips in 3 of 3 calls, 41.2 s cold and 12.5 s warm vs 54 s baseline); the 12 s extracting-to-analyzing step is unexplained; the 6 GB test clip is over the 2 GB upload cap.
+- Measured cost: about 6x real time on the 9B (40 s clip = 251 s). The 327 s test clip was 6 GB and hit the 2 GB upload limit. 10-minute runs untested.
 
 ## Decisions
 - Made: D1 long clips are a goal; D2 9B for dev, 35B for real runs; timing constants recalibrated to real speech (4.5 s gap, 3 quips and 10 words per window).
