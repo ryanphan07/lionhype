@@ -3,14 +3,14 @@
 ## Project context
 LionHype is a local-first app that turns lion dance videos into humorous, time-synced AI commentary with TTS audio. FastAPI backend (OpenCV frames, OpenAI-compatible multimodal LLM, edge-tts) + React/Vite frontend with WebSocket progress.
 
-Goal: a credible, honest, demoable MVP for a resume: upload a clip, see progress, get commentary with non-overlapping audio, run locally in a few commands. Short clips (up to about 60 s) are the supported demo. Longer clips up to `MAX_VIDEO_SECONDS` (1800) and `MAX_UPLOAD_MB` (2048) are allowed but slow and untested; see docs/DECISIONS.md D1. Do not add features beyond `docs/AUDIT.md` and `TASKS.md` without asking.
+Goal: a credible, honest, demoable MVP: upload a clip, see progress, get commentary with non-overlapping audio, run locally in a few commands. Short clips (up to about 60 s) are the supported demo. Longer clips up to `MAX_VIDEO_SECONDS` (1800) and `MAX_UPLOAD_MB` (2048) are allowed but slow and untested; see docs/DECISIONS.md D1. Planned work is in `docs/TASKS.md`.
 
 ## Environment
 - Windows + PowerShell. Native run; there are no Docker files.
 - LLM: llama-server (OpenAI-compatible) at `http://127.0.0.1:8080/v1`, multimodal via `--mmproj`. Configure via `backend/.env` (see `backend/.env.example` for LLM_*, WINDOW_SECONDS, FRAMES_PER_WINDOW, FRAME_WIDTH, MAX_QUIPS_PER_WINDOW, MAX_VIDEO_SECONDS).
-- Model in use on 2026-10-28: Qwen3.5-9B Q4_K_M (CLAUDE.md names Qwen3.6-35B-A3B). Measured (docs/BENCHMARKS.md): about 54 s per LLM call, 299 s for a 40 s clip.
+- Model in use on 2026-10-28: Qwen3.5-9B Q4_K_M (the larger Qwen3.6-35B-A3B is the intended model for real runs). Measured (docs/BENCHMARKS.md): about 54 s per LLM call, 299 s for a 40 s clip.
 - Start it with: `llama-server -m <gguf> --mmproj <mmproj-F16.gguf> -c 32768 -np 1 -ngl 99 --port 8080 --jinja`
-- The system prompt lives in `backend/app/prompts/commentary_system.txt` (owner-written; `MAX_QUIPS` is replaced by MAX_QUIPS_PER_WINDOW at load). The LLM step never falls back to canned text: a failed window ends the job in `error`.
+- The system prompt lives in `backend/app/prompts/commentary_system.txt` (`MAX_QUIPS` is replaced by MAX_QUIPS_PER_WINDOW at load). The LLM step never falls back to canned text: a failed window ends the job in `error`.
 - TTS: edge-tts (needs internet). Failures yield no audio (`audio_url` null), never placeholder files. Settings: TTS_VOICE, TTS_RATE, TTS_TIMEOUT_SECONDS, TTS_CONCURRENCY (1), TTS_START_STAGGER_SECONDS (0.3), TTS_RETRIES, TTS_RETRY_DELAY_SECONDS, MAX_SHIFT_SEC. Retried once: timeouts, connection errors, 5xx, edge-tts NoAudioReceived/WebSocketError; never 401/403. `backend/scripts/tts_check.py` smoke-tests the TTS path.
 - All settings come from the single shared `settings` object in `backend/app/config.py`. No hardcoded URLs or paths elsewhere.
 
@@ -24,9 +24,9 @@ Run from the repo root in PowerShell unless noted. Tests (130) verified 2026-10-
 - Frontend: `cd frontend; npm run lint; npm run build; npm run dev` (dev server on http://localhost:5173).
 
 ## Documentation
-- Update docs once at the end of each work session, not after every edit:
+- Update docs once at the end of each batch of work, not after every edit:
   - `STATE.md`: what is implemented
-  - `TASKS.md`: what is missing or next
+  - `TASKS.md`: roadmap
   - `README.md`: what it is, architecture, quickstart, route list, known limitations
 - Docs must match the code. Mark anything unverified as untested.
 - No pasted chat text, citation markers, or meta commentary in docs.
@@ -78,4 +78,4 @@ idle -> uploading -> extracting -> analyzing -> synthesizing -> completed
 - Backend settings/schemas: `backend/app/config.py`, `backend/app/schemas/`
 - Backend tests: `backend/tests/`; dev scripts: `backend/scripts/`
 - Frontend app/state: `frontend/src/App.jsx`; components: `frontend/src/components/`
-- Docs: root `README.md`; in `docs/`: `STATE.md`, `TASKS.md`, `AUDIT.md`, `DECISIONS.md`, `OWNER_TODO.md`, `BRIEFING.md` (summary for the owner's planning chat: refresh it at the end of any session that changes state, decisions or roadmap), `HANDOFF.md`
+- Docs: root `README.md`; in `docs/`: `STATE.md`, `TASKS.md`, `DECISIONS.md`, `BENCHMARKS.md`, `CONVENTIONS.md`.

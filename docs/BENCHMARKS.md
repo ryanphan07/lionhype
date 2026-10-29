@@ -67,8 +67,8 @@ Per-window LLM seconds:
 - hoco_40s.mp4: 53.9s, 57.5s, 52.5s, 55.5s
 - shorter_test.mp4: 52.0s
 
-Notes on this run (session 16, with the session 15 multi-object JSON fix; nothing was tuned during the run):
-- `LLM_JSON_SCHEMA=true` (the default since session 15; not in the settings list above because the script does not print it). Unusable-reply retries: 0 ("unusable reply" appears 0 times in the backend log). LLM calls equal windows: 4 for hoco_40s, 1 for shorter_test. The 2026-10-28 17:07 run had 3 retries in 9 calls.
+Notes on this run (with the multi-object JSON fix; nothing was tuned during the run):
+- `LLM_JSON_SCHEMA=true` (the default; not in the settings list above because the script does not print it). Unusable-reply retries: 0 ("unusable reply" appears 0 times in the backend log). LLM calls equal windows: 4 for hoco_40s, 1 for shorter_test. The 2026-10-28 17:07 run had 3 retries in 9 calls.
 - hoco_40s: 250.8 s versus 298.6 s before (about 6.2x real time versus 7.4x); shorter_test cold: 66.1 s versus 124.3 s. Per-call time is unchanged at about 54 s; the gain is the removed retries. Quips went 7 to 6 (model output varies run to run).
 - hoco2026.MOV and the warm repeat were not run this time. Model: Qwen3.5-9B Q4_K_M, not the 35B-A3B.
 - Quality of the commentary and the audio were not judged here.

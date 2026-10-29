@@ -2,7 +2,11 @@
 
 Upload a short lion dance video and get humorous, time-synced play-by-play commentary, read aloud while the video plays. A local vision LLM watches the footage, edge-tts speaks the lines, and the server schedules them so they never overlap.
 
-Status: working local prototype, not a product. It runs end to end with no fake output: if the model or TTS fails, you see an error or a "no audio" notice, never placeholder content. Demo: see the Demo section.
+Status: v0.1.0, a working local prototype, not a product. It runs end to end with no fake output: if the model or TTS fails, you see an error or a "no audio" notice, never placeholder content.
+
+![demo](docs/demo.gif)
+
+[Full clip with sound](docs/demo.mp4) (screen recording of the app playing a 40 s clip with generated commentary).
 
 ## How it works
 
@@ -81,7 +85,7 @@ Not covered by automated tests: the real model, the real TTS service, browser pl
 
 ## Benchmarks
 
-Measured with `backend/scripts/benchmark.py` on Windows 11, Qwen3.5-9B Q4_K_M via llama-server, default settings, edge-tts 7.3.1. Full data and environment: `docs/BENCHMARKS.md`.
+Measured with `backend/scripts/benchmark.py` on Windows 11, Qwen3.5-9B Q4_K_M via llama-server, default settings, edge-tts 7.3.1. Full data and environment: [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
 
 | Clip | Length | Processing | Quips (with audio) | Spoken | Overlaps | Shifted / dropped / TTS failed |
 |---|---|---|---|---|---|---|
@@ -90,16 +94,10 @@ Measured with `backend/scripts/benchmark.py` on Windows 11, Qwen3.5-9B Q4_K_M vi
 
 Run on 2026-10-28 with `LLM_JSON_SCHEMA=true` (the default): 0 unusable-reply retries in 5 model calls, about 54 s per call. The earlier run without the fix needed 3 retries in 9 calls (40 s clip: 299 s). hoco2026.MOV (327 s, 6 GB) was rejected by the default 2 GB upload limit in the earlier run and was not re-run.
 
-## Demo
-
-![demo](docs/demo.gif)
-
-[Full clip with sound](docs/demo.mp4) (screen recording of the app playing a 40 s clip with generated commentary).
-
 ## How it was tested
 - 130 automated tests (LLM and edge-tts faked; real tiny videos and a real mp3), frontend lint and build.
 - One scripted end-to-end run on 3 real clips plus a repeat (table above) against a real llama-server and the real edge-tts service: all 4 accepted jobs finished, with no overlapping audio and no TTS failures in the timeline.
-- Browser playback (sync, seek, pause) checked by the owner on 2026-10-28 with hoco_40s.mp4 and the final fix: no problems seen.
+- Browser playback (sync, seek, pause) checked by hand on 2026-10-28 with hoco_40s.mp4 and the final fix: no problems seen.
 - Untested: commentary quality (judged by ear and eye only), clips longer than 40 s, the 35B-A3B model, other machines.
 
 ## Troubleshooting
@@ -118,4 +116,4 @@ Run on 2026-10-28 with `LLM_JSON_SCHEMA=true` (the default): 0 unusable-reply re
 - Runs natively on Windows only; there are no Docker files.
 
 ## More
-- `docs/BRIEFING.md` project summary for planning, `docs/OWNER_TODO.md` owner checklist, `docs/DECISIONS.md` design decisions, `docs/STATE.md` what is implemented, `docs/TASKS.md` what is next, `docs/AUDIT.md` latest audit, `docs/CONVENTIONS.md` contracts and rules.
+- [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md) contracts and rules, [`docs/DECISIONS.md`](docs/DECISIONS.md) design decisions, [`docs/STATE.md`](docs/STATE.md) what is implemented, [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) measurements, [`docs/TASKS.md`](docs/TASKS.md) roadmap.

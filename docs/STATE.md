@@ -1,6 +1,6 @@
 # LionHype: current state (2026-10-28)
 
-What exists today. Verified means checked by a test or by a run; untested means written but never exercised. Source of truth for gaps: `docs/AUDIT.md`; for next work: `docs/TASKS.md`.
+What exists today. Verified means checked by a test or by a run; untested means written but never exercised. Next work: `docs/TASKS.md`.
 
 ## Flow
 
@@ -17,7 +17,7 @@ The browser keeps the file as a blob URL for playback; the server never serves v
 
 | File | What it does | Status |
 |---|---|---|
-| `main.py` | FastAPI app, CORS, `POST /api/upload`, `GET /api/jobs/{id}`, `WS /ws/analyze/{job_id}`, audio-only static mount, generic 500 handler, periodic job cleanup | Route tests (LLM/TTS faked); upload and ws exercised by hand in earlier sessions |
+| `main.py` | FastAPI app, CORS, `POST /api/upload`, `GET /api/jobs/{id}`, `WS /ws/analyze/{job_id}`, audio-only static mount, generic 500 handler, periodic job cleanup | Route tests (LLM/TTS faked); upload and ws exercised by hand |
 | `config.py` | Single `settings` object, `.env` resolved relative to the file. Full list in `backend/.env.example` | Verified |
 | `services/jobs.py` | In-memory `JobStore`: status/progress monotonic, terminal states sticky, subscriber queues, TTL purge, pipeline task handles (a stale job's task is cancelled) | Verified (12 tests) |
 | `services/pipeline.py` | Background runner; failure marks job `error` with a generic message and deletes the job's files | Verified |
@@ -26,10 +26,10 @@ The browser keeps the file as a blob URL for playback; the server never serves v
 | `services/commentary.py` | Window loop, `finalize_timeline` (sort, clamp, round to 2 decimals, `MIN_QUIP_GAP_SEC`; text is never cut), TTS fan-out, `schedule_quips`, `audio_available` | Verified live before the F1-F3 fixes; re-verify live |
 | `services/tts.py` | edge-tts with `TTS_VOICE`/`TTS_RATE`, per-clip `TTS_TIMEOUT_SECONDS`, one retry for transient errors incl. NoAudioReceived, failure diagnostics in the log, duration re-measured once after 0.2 s; clips run one at a time (`TTS_CONCURRENCY=1`, 0.3 s start stagger, in commentary.py); any failure deletes partial files and returns None; durations via mutagen (unreadable duration counts as failure) | Verified live with edge-tts 7.3.1 |
 | `schemas/events.py` | `CommentaryQuip{timestamp,text,audio_url,duration_sec}`, `CommentaryResponse{quips,video_url,audio_available}` | Verified |
-| `prompts/commentary_system.txt` | Owner-written announcer prompt; `MAX_QUIPS` replaced at load; cached per process (restart after editing) | Works with the 9B model; quality on real motion not judged |
+| `prompts/commentary_system.txt` | Announcer prompt; `MAX_QUIPS` replaced at load; cached per process (restart after editing) | Works with the 9B model; quality on real motion not judged |
 
 ### Behavior worth knowing
-- Limits: extensions `.mp4 .mov .avi`, `MAX_UPLOAD_MB` (2048), `MAX_VIDEO_SECONDS` (1800). Long clips (10+ min) are allowed by the limits but untested: see TASKS session 7b. Rejections are HTTP 400 `{"detail": ...}` and delete the file.
+- Limits: extensions `.mp4 .mov .avi`, `MAX_UPLOAD_MB` (2048), `MAX_VIDEO_SECONDS` (1800). Long clips (10+ min) are allowed by the limits but untested. Rejections are HTTP 400 `{"detail": ...}` and delete the file.
 - A window that fails (transport error, unusable JSON after one retry) fails the whole job. A job with zero usable quips fails. The job error text is one of: model not reachable or timed out, model returned unusable output, video could not be processed, or the generic "Commentary generation failed" (`pipeline.friendly_error`).
 - TTS failures never fail the job: the quip is kept with `audio_url: null, duration_sec: null`; if no clip has audio the job message is "Commentary ready (audio unavailable)".
 - `schedule_quips`: audio quips are processed in time order and may not start before the previous audio ends + 0.3 s; shift up to `MAX_SHIFT_SEC` (2.0) else drop (also dropped if the shifted start is past the video end, and the dropped quip's mp3 is deleted); no-audio quips never block. Every shift/drop is logged.
@@ -40,7 +40,7 @@ The browser keeps the file as a blob URL for playback; the server never serves v
 ## Frontend (`frontend/src/`)
 - `App.jsx`: upload via axios, then `WS /ws/analyze/{job_id}` with capped exponential reconnect (5 tries), then a 5 s polling fallback on `GET /api/jobs/{id}` (not browser-tested), switches on `msg.status` only, on `completed` fetches `GET /api/jobs/{id}`, shows toast + inline error, `VITE_API_BASE` (default http://localhost:8000).
 - `components/VideoPlayer.jsx`: blob-URL video, quip queue driven by `timeupdate`, one clip at a time, video ducked to 0.3 while a clip plays, stale lines (older than 4 s) skipped, seek resets, pause/resume handled, autoplay-block notice, "audio unavailable" notice, clickable commentary list that seeks.
-- Lint and build pass. No frontend tests. Browser behavior (progress, sync, seek) has not been re-verified since session 6.
+- Lint and build pass. No frontend tests.
 
 ## Tests: 130 passing (`pytest backend/tests -q`)
 - `test_jobs.py` JobStore. `test_api.py` upload, job GET, WebSocket, cleanup, videos not served, validators. `test_commentary.py` orchestration with LLM/TTS faked. `test_vision.py` crop, windows, frame sampling on real tiny videos, prompt/message building, parser, finalize, window failure. `test_audio.py` TTS success/failure/timeout/no leftover files, mutagen on a hand-built mp3, `schedule_quips`, `audio_available`, parser edge cases.
@@ -50,20 +50,20 @@ The browser keeps the file as a blob URL for playback; the server never serves v
 - Verified 2026-10-28: a brand-new venv from `requirements-dev.txt` passes all tests; a fresh `npm ci` passes lint and build.
 - `backend/requirements.txt` is pinned (includes `websockets`, required by uvicorn for the WS route); `backend/requirements-dev.txt` adds pytest.
 - Windows native, no Docker.
-- llama-server at 127.0.0.1:8080 with `--mmproj`. In use now: Qwen3.5-9B Q4_K_M; CLAUDE.md names Qwen3.6-35B-A3B. Decide which one is the demo model.
+- llama-server at 127.0.0.1:8080 with `--mmproj`. In use now: Qwen3.5-9B Q4_K_M; Qwen3.6-35B-A3B is the intended model for real runs (unmeasured).
 - edge-tts must be >= 7.3.1 (7.2.8 gets 403).
 
-## Known gaps for long clips (audit 3)
-The pipeline handles long clips by limits only. Not yet robust: all-or-nothing results (D4), no resume after a page refresh. (SDK retries, the stuck lock and generic errors were fixed in session 11.) See TASKS session 11 and DECISIONS D4.
+## Known gaps for long clips
+The pipeline handles long clips by limits only. Not yet robust: all-or-nothing results (D4), no resume after a page refresh. See DECISIONS D4.
 
-## Verified live (2026-10-28, session 14; numbers in docs/BENCHMARKS.md)
-Full pipeline over HTTP on Qwen3.5-9B with real edge-tts: 4 of 4 accepted jobs completed (4.8 s clip cold and warm, 40.2 s clip in 299 s), no audio overlap, no TTS failures, no shifts or drops. Found: about 1 in 3 model calls returned unusable JSON and was retried (addressed in session 15, confirmed by the session 16 re-run (0 retries)); a 6 GB clip is rejected by the 2 GB cap. `backend/scripts/benchmark.py` reproduces this. Browser behavior and audio quality still not checked.
+## Verified live (2026-10-28, first run; numbers in docs/BENCHMARKS.md)
+Full pipeline over HTTP on Qwen3.5-9B with real edge-tts: 4 of 4 accepted jobs completed (4.8 s clip cold and warm, 40.2 s clip in 299 s), no audio overlap, no TTS failures, no shifts or drops. Found: about 1 in 3 model calls returned unusable JSON and was retried (fixed with the tolerant parser and constrained output, confirmed by the re-run with 0 retries); a 6 GB clip is rejected by the 2 GB cap. `backend/scripts/benchmark.py` reproduces this. Browser behavior and audio quality still not checked.
 
-## Verified on a live server (2026-10-28, audit 4)
-With the LLM stopped: upload accepted, job fails in about 4 s with the categorized message over both WebSocket and GET, source video deleted, next upload accepted. Everything LLM-, TTS-timing- or browser-related is still as last verified in sessions 5-6.
+## Verified on a live server (2026-10-28)
+With the LLM stopped: upload accepted, job fails in about 4 s with the categorized message over both WebSocket and GET, source video deleted, next upload accepted.
 
 ## Maturity
-Local-first prototype that runs end to end with no fake output. Not hardened: single in-memory job store, no auth, no queue, one unofficial TTS endpoint (dependencies are pinned). Demoable: real-footage runs and the browser check are done (2026-10-28); the demo GIF/video is pending.
+Local-first prototype that runs end to end with no fake output. Not hardened: single in-memory job store, no auth, no queue, one unofficial TTS endpoint (dependencies are pinned). Demoable: real-footage runs and the browser check are done (2026-10-28); demo GIF and video are in `docs/`.
 
-## Verified in the browser and re-benchmarked (2026-10-28, session 16)
-Owner checked browser playback (sync, seek, pause) on hoco_40s.mp4 with the session 15 fix: no problems seen. Benchmark with `LLM_JSON_SCHEMA=true`: 40.2 s clip in 251 s (6 quips, 22.8 s spoken, 4 calls, 0 retries), 4.8 s clip in 66 s; about 6x real time on the 9B (docs/BENCHMARKS.md).
+## Verified in the browser and re-benchmarked (2026-10-28)
+Browser playback (sync, seek, pause) was checked by hand on hoco_40s.mp4: no problems seen. Benchmark with `LLM_JSON_SCHEMA=true`: 40.2 s clip in 251 s (6 quips, 22.8 s spoken, 4 calls, 0 retries), 4.8 s clip in 66 s; about 6x real time on the 9B (docs/BENCHMARKS.md).
