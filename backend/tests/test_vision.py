@@ -224,6 +224,49 @@ def test_clean_quips_drops_malformed_and_empty():
         llm_module.clean_quips({"quips": "nope"})
 
 
+SEEN = '{"seen": "The blue lion on the left crouches."}'
+QUIPS_OBJ = '{"quips": [{"t": 2.0, "text": "Big leap!"}]}'
+BARE = '{"t": 3.0, "text": "Second"}\n{"t": 1.0, "text": "First"}'
+
+
+@pytest.mark.parametrize("reply, texts", [
+    (SEEN + "\n" + QUIPS_OBJ, ["Big leap!"]),
+    (SEEN + "\n" + BARE, ["First", "Second"]),
+    ("```json\n" + SEEN + "\n```\n```json\n" + QUIPS_OBJ + "\n```", ["Big leap!"]),
+    ("```json\n" + SEEN + "\n" + BARE + "\n```", ["First", "Second"]),
+    ("<think>{\"quips\": []}</think>" + SEEN + " and then " + QUIPS_OBJ, ["Big leap!"]),
+    (SEEN + QUIPS_OBJ + BARE, ["Big leap!"]),  # a real quips list wins over bare objects
+])
+def test_extract_quips_from_multi_object_reply(reply, texts):
+    quips = llm_module.extract_quips(llm_module.parse_model_objects(reply))
+    assert [q["text"] for q in quips] == texts
+
+
+@pytest.mark.parametrize("reply", [SEEN, "```json\n" + SEEN + "\n```", SEEN + '{"t": 1, "text": ""}', "no json"])
+def test_extract_quips_fails_without_usable_content(reply):
+    with pytest.raises(llm_module.LLMOutputError):
+        llm_module.extract_quips(llm_module.parse_model_objects(reply))
+
+
+@pytest.mark.anyio
+async def test_multi_object_reply_needs_no_retry(monkeypatch, prompt_file):
+    client = use_client(monkeypatch, [SEEN + "\n" + BARE])
+    quips = await llm_module.analyze_window(FRAMES, 0.0, 3.0)
+    assert [q["text"] for q in quips] == ["First", "Second"] and len(client.calls) == 1
+
+
+@pytest.mark.anyio
+async def test_unusable_reply_logged_in_full_capped(monkeypatch, prompt_file, caplog):
+    long_reply = SEEN[:-1] + ', "pad": "' + "x" * 3000 + '"}'
+    use_client(monkeypatch, [long_reply, SEEN])
+    with caplog.at_level(logging.WARNING, logger="lionhype.llm"):
+        with pytest.raises(llm_module.LLMOutputError):
+            await llm_module.analyze_window(FRAMES, 0.0, 3.0)
+    first = [r.getMessage() for r in caplog.records if "attempt 1" in r.getMessage()][0]
+    assert "The blue lion" in first and "x" * 1900 in first and "x" * 2100 not in first
+    assert any("attempt 2" in r.getMessage() and SEEN[:20] in r.getMessage() for r in caplog.records)
+
+
 @pytest.mark.anyio
 async def test_retry_once_with_json_nudge(monkeypatch, prompt_file):
     client = use_client(monkeypatch, ["totally not json", GOOD])

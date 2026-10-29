@@ -45,18 +45,45 @@ def strip_think(text: str) -> str:
     return re.sub(r"^.*?</think>", "", text, flags=re.DOTALL).strip()  # opening tag was in the template
 
 
-def parse_model_json(text: str) -> Dict[str, Any]:
-    """Pull the first JSON object out of the reply, tolerating code fences and stray prose."""
-    text = strip_think(text or "")
+def parse_model_objects(text: str) -> List[Dict[str, Any]]:
+    """Every top-level JSON object in the reply, in order. Strips <think> blocks and code fences, skips prose."""
+    text = re.sub(r"```(?:json)?", "", strip_think(text or ""), flags=re.IGNORECASE)
     decoder = json.JSONDecoder()
-    for match in re.finditer(r"\{", text):
+    objects: List[Dict[str, Any]] = []
+    pos = text.find("{")
+    while pos != -1:
         try:
-            obj, _ = decoder.raw_decode(text[match.start():])
+            obj, length = decoder.raw_decode(text[pos:])
         except json.JSONDecodeError:
+            pos = text.find("{", pos + 1)
             continue
         if isinstance(obj, dict):
-            return obj
-    raise LLMOutputError("No JSON object found in model reply")
+            objects.append(obj)
+            pos = text.find("{", pos + length)
+        else:
+            pos = text.find("{", pos + 1)
+    return objects
+
+
+def parse_model_json(text: str) -> Dict[str, Any]:
+    """The first JSON object in the reply."""
+    objects = parse_model_objects(text)
+    if not objects:
+        raise LLMOutputError("No JSON object found in model reply")
+    return objects[0]
+
+
+def extract_quips(objects: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Quips from the first object with a 'quips' list; else from objects that are themselves single quips."""
+    for obj in objects:
+        if isinstance(obj.get("quips"), list):
+            return clean_quips(obj)
+    singles = [o for o in objects if "t" in o and "text" in o]
+    if singles:
+        quips = clean_quips({"quips": singles})
+        if quips:
+            return quips
+    raise LLMOutputError("Model JSON has no 'quips' list")
 
 
 def clean_quips(parsed: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -144,11 +171,12 @@ async def analyze_window(
         messages = build_messages(frames, start, end, previous_quips, nudge=attempt > 0)
         reply = await _call(messages, len(frames), label)
         try:
-            parsed = parse_model_json(reply)
-            quips = clean_quips(parsed)
-            logger.debug("%s seen: %s", label, str(parsed.get("seen"))[:300])
+            objects = parse_model_objects(reply)
+            quips = extract_quips(objects)
+            seen = next((o["seen"] for o in objects if "seen" in o), None)
+            logger.debug("%s seen: %s", label, str(seen)[:300])
             return quips
         except LLMOutputError as exc:
             last_error = exc
-            logger.warning("%s: unusable reply on attempt %d (%s); reply head: %r", label, attempt + 1, exc, reply[:200])
+            logger.warning("%s: unusable reply on attempt %d (%s); full reply: %r", label, attempt + 1, exc, reply[:2000])
     raise LLMOutputError(f"{label}: model returned no usable JSON after retry") from last_error
