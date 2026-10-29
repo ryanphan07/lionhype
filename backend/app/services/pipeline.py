@@ -37,14 +37,23 @@ def friendly_error(exc: BaseException) -> str:
 
 
 def cleanup_job_files(job_id: str, video_path: str) -> None:
-    """Delete the job's video, frames dir and audio dir. Never raises."""
+    """Delete the job's video, frames dir, audio dir and rendered exports. Never raises."""
     if os.path.exists(video_path):
         try:
             os.remove(video_path)
         except OSError:
             logger.exception("Could not delete video for job %s", job_id)
-    for sub in ("frames", "audio"):
+    for sub in ("frames", "audio", "exports"):
         shutil.rmtree(os.path.join(settings.UPLOAD_DIR, sub, job_id), ignore_errors=True)
+
+
+def purge_expired_jobs() -> int:
+    """Forget jobs past their TTL and delete their files. Call this instead of job_store.purge_expired alone."""
+    paths = job_store.video_paths()
+    purged = job_store.purge_expired()
+    for job_id in purged:
+        cleanup_job_files(job_id, paths.get(job_id, ""))
+    return len(purged)
 
 
 _VIDEO_NAME = re.compile(r"[0-9a-f]{32}_.+")
@@ -52,9 +61,9 @@ _AUDIO_DIR_NAME = re.compile(r"[0-9a-f]{32}")
 
 
 def sweep_uploads() -> int:
-    """Delete leftover files this app created (`<job id>_<name>` videos, `<job id>` audio folders). Call at startup, when the in-memory job store is empty."""
+    """Delete leftover files this app created (`<job id>_<name>` videos, `<job id>` audio and export folders). Call at startup, when the in-memory job store is empty."""
     removed = 0
-    for sub, pattern, want_dir in (("videos", _VIDEO_NAME, False), ("audio", _AUDIO_DIR_NAME, True)):
+    for sub, pattern, want_dir in (("videos", _VIDEO_NAME, False), ("audio", _AUDIO_DIR_NAME, True), ("exports", _AUDIO_DIR_NAME, True)):
         folder = os.path.join(settings.UPLOAD_DIR, sub)
         if not os.path.isdir(folder):
             continue
@@ -89,11 +98,7 @@ async def run_pipeline(job_id: str, video_path: str) -> None:
 
     try:
         result = await process_video_commentary(video_path, job_id=job_id, progress_cb=progress_cb)
-        job_store.complete(job_id, result)
-        try:
-            os.remove(video_path)  # the browser plays its own copy; nothing reads the source again
-        except OSError:
-            logger.warning("Could not delete video for job %s", job_id)
+        job_store.complete(job_id, result)  # the source video stays until the job expires, for mp4 export
     except asyncio.CancelledError:
         logger.warning("Pipeline for job %s was cancelled", job_id)
         cleanup_job_files(job_id, video_path)

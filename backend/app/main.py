@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.services.jobs import TERMINAL, JobNotFoundError, job_store
-from app.services.pipeline import cleanup_job_files, run_pipeline, sweep_uploads
+from app.services.pipeline import cleanup_job_files, purge_expired_jobs, run_pipeline, sweep_uploads
 from app.services.video_processor import validate_upload_metadata, sanitize_filename, is_video_corrupt, get_video_duration
 
 logging.basicConfig(
@@ -27,9 +27,7 @@ async def _cleanup_loop() -> None:
     while True:
         await asyncio.sleep(settings.CLEANUP_INTERVAL_SECONDS)
         try:
-            paths = job_store.video_paths()
-            for job_id in job_store.purge_expired():
-                cleanup_job_files(job_id, paths.get(job_id, ""))
+            purge_expired_jobs()
         except Exception:
             logger.exception("Periodic cleanup failed")
 
@@ -70,6 +68,7 @@ async def global_exception_handler(_, exc: Exception):
 
 @app.post("/api/upload")
 async def upload_video(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    purge_expired_jobs()  # kept videos pile up otherwise: job_store.create would drop expired jobs without deleting files
     if job_store.has_active():
         raise HTTPException(status_code=409, detail=BUSY_DETAIL)
     if not file.filename:

@@ -71,7 +71,7 @@ def test_upload_runs_pipeline_and_completes(client, upload_dir, fake_ai, video_b
     assert job["progress"] == 100
     assert [q["text"] for q in job["result"]["quips"]] == ["first", "second"]
     assert job["result"]["quips"][0]["audio_url"].startswith(f"http://test/{body['job_id']}/")
-    assert not os.path.exists(upload_dir / "videos" / f"{body['job_id']}_my_clip_.avi")  # source deleted after success
+    assert os.path.exists(upload_dir / "videos" / f"{body['job_id']}_my_clip_.avi")  # kept for mp4 export until the job expires
     assert not (upload_dir / "frames").exists()
 
 
@@ -345,3 +345,15 @@ def test_friendly_error_categories():
     assert "unusable output" in friendly_error(LLMOutputError("bad json"))
     assert "video" in friendly_error(ValueError("No frames"))
     assert friendly_error(RuntimeError("secret")) == GENERIC_FAILURE
+
+
+def test_kept_video_is_deleted_when_the_job_expires(client, upload_dir, fake_ai, video_bytes):
+    job_id = upload(client, video_bytes).json()["job_id"]
+    video = upload_dir / "videos" / f"{job_id}_clip.avi"
+    (upload_dir / "exports" / job_id).mkdir(parents=True)
+    assert video.exists()
+
+    job_store.get(job_id).updated_at = 0
+    assert upload(client, video_bytes).status_code == 200  # the next upload purges the expired job and its files
+    assert not video.exists()
+    assert not (upload_dir / "exports" / job_id).exists()
