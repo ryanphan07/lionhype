@@ -11,13 +11,13 @@ upload -> validate + save -> job created -> background pipeline:
   synthesizing finalize timeline -> edge-tts per quip (bounded concurrency) -> measure durations -> schedule
   completed    GET /api/jobs/{id} returns quips + audio_available
 ```
-The browser keeps the file as a blob URL for playback; the server never serves videos.
+The browser keeps the file as a blob URL for playback; the server never serves raw videos, only rendered exports.
 
 ## Backend (`backend/app/`)
 
 | File | What it does | Status |
 |---|---|---|
-| `main.py` | FastAPI app, CORS, `POST /api/upload`, `GET /api/jobs/{id}`, `WS /ws/analyze/{job_id}`, audio-only static mount, generic 500 handler, periodic job cleanup | Route tests (LLM/TTS faked); upload and ws exercised by hand |
+| `main.py` | FastAPI app, CORS, `POST /api/upload`, `GET /api/jobs/{id}`, `GET /api/jobs/{id}/export.mp4`, `WS /ws/analyze/{job_id}`, audio-only static mount, generic 500 handler, periodic job cleanup | Route tests (LLM/TTS faked); upload and ws exercised by hand |
 | `config.py` | Single `settings` object, `.env` resolved relative to the file. Full list in `backend/.env.example` | Verified |
 | `services/jobs.py` | In-memory `JobStore`: status/progress monotonic, terminal states sticky, subscriber queues, TTL purge, pipeline task handles (a stale job's task is cancelled) | Verified (12 tests) |
 | `services/pipeline.py` | Background runner; failure marks job `error` with a generic message and deletes the job's files | Verified |
@@ -25,25 +25,27 @@ The browser keeps the file as a blob URL for playback; the server never serves v
 | `services/llm.py` | `analyze_window`: system prompt + `image_url` parts, `<think>` and fence stripping, tolerant parse of every top-level JSON object (`raw_decode`; first with a `quips` list, else bare quip objects), `LLM_JSON_SCHEMA` constrained output (default on), one retry with a JSON nudge, one retry without `response_format` on HTTP 400 while the schema is on (warning logged), full unusable reply logged (2000 chars), token/time logging. No canned fallback: failures raise | Verified live (one window, Qwen3.5-9B, 44.7 s for 6 frames / 3248 prompt tokens) |
 | `services/commentary.py` | Window loop, `finalize_timeline` (sort, clamp, round to 2 decimals, `MIN_QUIP_GAP_SEC`; text is never cut), TTS fan-out, `schedule_quips`, `audio_available` | Verified live before the F1-F3 fixes; re-verify live |
 | `services/tts.py` | edge-tts with `TTS_VOICE`/`TTS_RATE`, per-clip `TTS_TIMEOUT_SECONDS`, one retry for transient errors incl. NoAudioReceived, failure diagnostics in the log, duration re-measured once after 0.2 s; clips run one at a time (`TTS_CONCURRENCY=1`, 0.3 s start stagger, in commentary.py); any failure deletes partial files and returns None; durations via mutagen (unreadable duration counts as failure) | Verified live with edge-tts 7.3.1 |
+| `services/export.py` | mp4 export: pure builders (`build_ffmpeg_args`, `build_ass`, `duck_intervals`, `caption_spans`) plus `render_export` (async subprocess, cwd = `uploads/exports/<job id>/`, relative subtitle name, `.partial.mp4` then rename, cached per job + captions flag, per-key lock, killed on timeout or cancel). Original audio ducked -10 dB while quips play (near quips merged), quips via `adelay` + `amix`, H.264 crf 23 + AAC, even dimensions, no-audio quips captioned for 3 s. ffmpeg from `FFMPEG_PATH` or imageio-ffmpeg | Real render verified on a tiny video (size, codecs, burned captions, ducking level measured); not run on a real clip |
 | `schemas/events.py` | `CommentaryQuip{timestamp,text,audio_url,duration_sec}`, `CommentaryResponse{quips,video_url,audio_available}` | Verified |
 | `prompts/commentary_system.txt` | Announcer prompt; `MAX_QUIPS` replaced at load; cached per process (restart after editing) | Works with the 9B model; quality on real motion not judged |
 
 ### Behavior worth knowing
 - Limits: extensions `.mp4 .mov .avi`, `MAX_UPLOAD_MB` (2048), `MAX_VIDEO_SECONDS` (1800). Long clips (10+ min) are allowed by the limits but untested. Rejections are HTTP 400 `{"detail": ...}` and delete the file.
-- A window that fails (transport error or timeout after one more attempt, unusable JSON after one retry, no frames) is skipped and logged (DECISIONS D4, option B). `CommentaryResponse` has `skipped` (`[{start, end}]`) and `total_windows`; the completed message adds ", skipped n of m parts" and the player lists the ranges. A job where every window fails fails with the last failure's category. A job with zero usable quips fails. The job error text is one of: model not reachable or timed out, model returned unusable output, video could not be processed, or the generic "Commentary generation failed" (`pipeline.friendly_error`).
+- A window that fails (transport error or timeout after one more attempt, unusable JSON after one retry, no frames) is skipped and logged (DECISIONS D4, option B). `CommentaryResponse` has `skipped` (`[{start, end}]`) and `total_windows`; the completed message adds ", skipped n of m parts" and the player lists the ranges. The job fails instead of skipping when the model server is unreachable (no retry), when more than half the windows are skipped, or when 3 in a row are (D4 limits; error is the last failure's category). A job with zero usable quips fails. The job error text is one of: model not reachable or timed out, model returned unusable output, video could not be processed, or the generic "Commentary generation failed" (`pipeline.friendly_error`).
 - TTS failures never fail the job: the quip is kept with `audio_url: null, duration_sec: null`; if no clip has audio the job message is "Commentary ready (audio unavailable)".
 - `schedule_quips`: audio quips are processed in time order and may not start before the previous audio ends + 0.3 s; shift up to `MAX_SHIFT_SEC` (2.0) else drop (also dropped if the shifted start is past the video end, and the dropped quip's mp3 is deleted); no-audio quips never block. Every shift/drop is logged.
-- Cleanup: failure deletes video, frames and audio for the job; success deletes the source video immediately (audio stays until the job expires); a loop purges expired jobs (TTL 1 h) and their files; startup sweeps `uploads/videos` and `uploads/audio` (the store is empty then).
+- Cleanup: failure deletes video, frames and audio for the job; success keeps the source video, audio and exports until the job expires (the video is needed for export); `pipeline.purge_expired_jobs` (cleanup loop and every upload) removes expired jobs and their files; startup sweeps `uploads/videos`, `uploads/audio` and `uploads/exports` (the store is empty then).
 - One job at a time: an upload while another job is running gets HTTP 409 (no queue). A job with no progress update for `JOB_STALE_SECONDS` (1800) is failed so it cannot block uploads forever.
 - Removed earlier: `/api/commentary/*`, presigned/boto3 endpoint, `backend/main.py`, `mcp_server.py`, canned LLM output, fake audio, 224x224 JSON-text frames.
 
 ## Frontend (`frontend/src/`)
 - `App.jsx`: upload via axios, then `WS /ws/analyze/{job_id}` with capped exponential reconnect (5 tries), then a 5 s polling fallback on `GET /api/jobs/{id}` (not browser-tested), switches on `msg.status` only, on `completed` fetches `GET /api/jobs/{id}`, shows toast + inline error, `VITE_API_BASE` (default http://localhost:8000).
 - `components/VideoPlayer.jsx`: blob-URL video, quip queue driven by `timeupdate`, one clip at a time, video ducked to 0.3 while a clip plays, stale lines (older than 4 s) skipped, seek resets, pause/resume handled, autoplay-block notice, "audio unavailable" notice, clickable commentary list that seeks.
+- Completed jobs show "Download video" with a captions checkbox (default on), a "Rendering video…" state and an error toast; the file is saved as `maneframe_<original name>.mp4`. The response is held in browser memory as a blob. Not browser-tested.
 - Lint and build pass. No frontend tests.
 
-## Tests: 138 passing (`pytest backend/tests -q`)
-- `test_jobs.py` JobStore. `test_api.py` upload, job GET, WebSocket, cleanup, videos not served, validators. `test_commentary.py` orchestration with LLM/TTS faked. `test_vision.py` crop, windows, frame sampling on real tiny videos, prompt/message building, parser, finalize, window failure. `test_audio.py` TTS success/failure/timeout/no leftover files, mutagen on a hand-built mp3, `schedule_quips`, `audio_available`, parser edge cases.
+## Tests: 164 passing (`pytest backend/tests -q`)
+- `test_jobs.py` JobStore. `test_api.py` upload, job GET, WebSocket, cleanup, videos not served, validators. `test_commentary.py` orchestration with LLM/TTS faked. `test_vision.py` crop, windows, frame sampling on real tiny videos, prompt/message building, parser, finalize, window failure. `test_export.py` ffmpeg argument/ASS builders, export endpoint, one real render (skipped without ffmpeg). `test_audio.py` TTS success/failure/timeout/no leftover files, mutagen on a hand-built mp3, `schedule_quips`, `audio_available`, parser edge cases.
 - Not covered: real LLM or real edge-tts in CI (both need external services), real `motion_box` on moving-subject video, frontend.
 
 ## Environment

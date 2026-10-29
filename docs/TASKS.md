@@ -15,7 +15,7 @@ Design decisions are in `docs/DECISIONS.md`; what is implemented is in `docs/STA
 The goal is a better product for real users: lion dance teams turning performance clips into shareable posts. Honesty rules stay: no canned LLM text, no fake audio.
 
 ## Phase 1: shareable output and commentary quality
-- mp4 export: the video with the commentary audio mixed in and captions burned in.
+- mp4 export (done, session 21): the video with the commentary audio mixed in and optional burned-in captions; `GET /api/jobs/{id}/export.mp4`. Follow-ups: try it on a real clip, progress for long renders, output size options.
 - Commentary quality: lion dance domain vocabulary in the prompt, few-shot examples, `seen` continuity across windows, a style option, and a small eval set to compare prompts and models.
 
 ## Phase 2: speed and robustness
