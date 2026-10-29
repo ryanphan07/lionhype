@@ -1,29 +1,22 @@
-# Handoff: session 16 (v0.1.0 NOT tagged yet: demo assets pending)
+# Handoff: session 17 (v0.1.0 tagged locally, not pushed)
 
 ## 1. Done
-- CLAUDE.md: scope line now says "items in docs/TASKS.md 'Before v0.1.0'" (only change).
-- docs/BENCHMARKS.md: new 2026-10-28 20:41 section (old kept), notes LLM_JSON_SCHEMA=true and 0 retries.
-- README.md: new benchmark table and numbers (251 s, ~6x), browser-check line, "(no audio)" troubleshooting entry.
-- docs/AUDIT.md (M1-M4 FIXED), OWNER_TODO, STATE (maturity, new verified section), TASKS, BRIEFING refreshed.
+- docs/demo.mp4 (1.5 MB, H.264 crf 28, 720 px high, AAC, cropped to the app column) and docs/demo.gif (6.8 MB, 12 s from 12 s to 24 s, 640 px, 10 fps, palettegen). Raw recording stays in Downloads.
+- README: Demo section (GIF plus "Full clip with sound" link), Status line fixed. TASKS, BRIEFING, OWNER_TODO updated.
+- Tag v0.1.0 (annotated), not pushed.
 
 ## 2. Decisions and deviations
-- Step 3 (demo.mp4/demo.gif) NOT done: the prompt's recording path was a placeholder and you never gave one. The only recent captures are terminal recordings (Vite console), not the app. ffmpeg is installed but not on this shell's PATH:
-  C:\Users\ryanp\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-9.0.2-full_build\bin
-- README Demo section still has the TODO and <VIDEO_URL>; the Status line still says the GIF is not recorded. Tag v0.1.0 held so the tag includes the demo.
-- Step 5 skipped: parse_model_json is used by tests/test_audio.py and tests/test_vision.py.
-- Browser check recorded as "no problems seen" per your answer.
-- First benchmark attempt hit a down llama-server; that section was discarded, not committed. Benchmark ran hoco_40s and shorter_test only (no warm repeat, no hoco2026.MOV). Earlier uvicorn stopped; benchmark log in %TEMP%\lionhype_bench.log.
-- TASKS "Before v0.1.0": demo and tag items left open; the browser-check item was removed (done).
+- Cropped both assets to the app column (crop 960x970 at 480,110 of the 1080p recording); the mp4 is the full 40.6 s recording, not trimmed (it is all playback).
+- The recording opens on the finished job, so the GIF shows playback and commentary highlight, not the progress bar.
 
 ## 3. Results
-pytest 130 passed; eslint clean; vite build OK. Benchmark: hoco_40s 250.8 s, 6 quips, 0 retries; shorter_test 66.1 s.
+pytest 130 passed; eslint clean; vite build OK.
 
 ## 4. Not verified
-- Demo assets. Polling fallback, error paths, commentary quality by ear.
+- GIF/mp4 rendering on GitHub after push; audio in the mp4 by ear.
 
 ## 5. Open issues
-- README.md Demo section and Status line (line 5); docs/TASKS.md Before v0.1.0.
+- None new.
 
 ## 6. Suggested next session
-Finish v0.1.0: give the app recording path; make docs/demo.mp4 (720p, crf 28, AAC, <=10 MB) and docs/demo.gif (10-15 s, 640 px, 10 fps, <=8 MB); update README Demo/Status; `git tag -a v0.1.0 -m "LionHype v0.1.0"`.
-Then v0.1.1: HTTP 400 fallback for response_format, sequential crop sampling (12 s extract), 35B and long-clip measurements.
+v0.1.1: HTTP 400 fallback for response_format, sequential crop sampling (12 s extract), 35B and long-clip measurements.

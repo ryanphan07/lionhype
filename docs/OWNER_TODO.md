@@ -13,7 +13,7 @@ Everything Claude Code can do on its own is in `docs/TASKS.md` (v0.1.0 prep is n
 3. **After v0.1.0**: long clip (10+ min) and throughput table on the 9B and 35B (see `docs/TASKS.md` After v0.1.0).
 
 ## D. Ship
-1. Demo assets: the README Demo section needs `docs/demo.gif` and `docs/demo.mp4` (made from your browser recording with ffmpeg).
+1. Demo assets: done in session 17 (docs/demo.gif, docs/demo.mp4).
 2. Push the `v0.1.0` tag (Claude Code never pushes).
 3. Draft resume bullets with the planning chat from what the repo proves (see `docs/BRIEFING.md`).
 

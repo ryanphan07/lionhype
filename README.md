@@ -2,7 +2,7 @@
 
 Upload a short lion dance video and get humorous, time-synced play-by-play commentary, read aloud while the video plays. A local vision LLM watches the footage, edge-tts speaks the lines, and the server schedules them so they never overlap.
 
-Status: working local prototype, not a product. It runs end to end with no fake output: if the model or TTS fails, you see an error or a "no audio" notice, never placeholder content. Demo GIF: see the Demo section (not recorded yet).
+Status: working local prototype, not a product. It runs end to end with no fake output: if the model or TTS fails, you see an error or a "no audio" notice, never placeholder content. Demo: see the Demo section.
 
 ## How it works
 
@@ -92,7 +92,9 @@ Run on 2026-10-28 with `LLM_JSON_SCHEMA=true` (the default): 0 unusable-reply re
 
 ## Demo
 
-TODO: record `docs/demo.gif` and add it here: `![demo](docs/demo.gif)`. Full video with sound: <VIDEO_URL>
+![demo](docs/demo.gif)
+
+[Full clip with sound](docs/demo.mp4) (screen recording of the app playing a 40 s clip with generated commentary).
 
 ## How it was tested
 - 130 automated tests (LLM and edge-tts faked; real tiny videos and a real mp3), frontend lint and build.

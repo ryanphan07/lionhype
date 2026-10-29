@@ -29,7 +29,7 @@ LionHype turns a lion dance video into humorous, time-synced AI commentary with 
 2. Owner decides D4; Claude Code implements it (B is small; C is a larger API and player change).
 3. Live session (owner): checklist in `OWNER_TODO.md` section C; results go back to the chat and to Claude Code.
 4. Tune the prompt and settings from the measurements (frames, width, window length, TTS rate); pick 35B defaults.
-5. Ship: GIF, LICENSE, final README read, tag v0.1.0, resume bullets.
+5. Ship: GIF and video done (session 17), LICENSE done; v0.1.0 tagged locally, owner pushes; resume bullets remain.
 
 ## Ready-to-paste Claude Code session prompts
 **Session 12:** "Session 12: safety and long-clip hardening. Read CLAUDE.md, docs/HANDOFF.md, docs/TASKS.md (Session 12), docs/AUDIT.md (audit 4, M1-M4). Implement M1 (sweep only deletes job-id-prefixed videos and 32-hex audio folders; test that unrelated files survive), M2 (TTS_RETRIES default 1, short delay, per-clip progress), M3 (HTTP status errors say 'The AI model rejected the request'), M4 (cancel the pipeline task of a stale job). Update STATE/TASKS/AUDIT/README per CONVENTIONS, refresh docs/BRIEFING.md, then the handoff."
