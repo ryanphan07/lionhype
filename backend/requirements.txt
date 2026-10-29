@@ -10,3 +10,4 @@ mutagen==1.48.1
 openai==2.20.0
 python-multipart==0.0.32
 numpy==2.5.2
+imageio-ffmpeg==0.7.0

@@ -6,6 +6,7 @@ import shutil
 from typing import Optional
 
 from app.config import settings
+from app.services.export import forget_job_locks
 from app.services.commentary import process_video_commentary
 from app.services.llm import LLMOutputError
 from app.services.jobs import job_store
@@ -45,6 +46,7 @@ def cleanup_job_files(job_id: str, video_path: str) -> None:
             logger.exception("Could not delete video for job %s", job_id)
     for sub in ("frames", "audio", "exports"):
         shutil.rmtree(os.path.join(settings.UPLOAD_DIR, sub, job_id), ignore_errors=True)
+    forget_job_locks(job_id)
 
 
 def purge_expired_jobs() -> int:

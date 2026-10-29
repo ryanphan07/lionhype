@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     TTS_RETRY_DELAY_SECONDS: float = 1.0
     MAX_SHIFT_SEC: float = 2.0
 
+    FFMPEG_PATH: str = ""  # empty: use the ffmpeg binary bundled with imageio-ffmpeg
+    EXPORT_TIMEOUT_SECONDS: float = 1800.0  # max time for one mp4 render
+
     LOG_LEVEL: str = "INFO"
 
     JOB_TTL_SECONDS: int = 3600

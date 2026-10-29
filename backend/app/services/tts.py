@@ -79,14 +79,21 @@ def _remove_quietly(path: str) -> None:
         logger.warning("Could not delete partial audio file %s", path)
 
 
-def remove_clip_file(video_id: str, audio_url: Optional[str]) -> None:
-    """Delete the mp3 behind an audio_url (used for quips the scheduler dropped). Never raises."""
+def clip_path(video_id: str, audio_url: Optional[str]) -> Optional[str]:
+    """The server-side path of the mp3 behind an audio_url, or None if the id or url is not one this app produced."""
     if not audio_url or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", video_id):
-        return
+        return None
     name = os.path.basename(audio_url.split("?")[0])
     if not re.fullmatch(r"[A-Za-z0-9_.-]+\.mp3", name):
-        return
-    _remove_quietly(os.path.join(settings.UPLOAD_DIR, "audio", video_id, name))
+        return None
+    return os.path.join(settings.UPLOAD_DIR, "audio", video_id, name)
+
+
+def remove_clip_file(video_id: str, audio_url: Optional[str]) -> None:
+    """Delete the mp3 behind an audio_url (used for quips the scheduler dropped). Never raises."""
+    path = clip_path(video_id, audio_url)
+    if path:
+        _remove_quietly(path)
 
 
 async def generate_audio_clip(quip: Dict[str, Any], video_id: Optional[str] = None) -> Optional[Dict[str, Any]]:

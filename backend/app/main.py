@@ -7,10 +7,11 @@ import uuid
 
 from fastapi import FastAPI, File, UploadFile, WebSocket, WebSocketDisconnect, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
+from app.services.export import ExportError, render_export
 from app.services.jobs import TERMINAL, JobNotFoundError, job_store
 from app.services.pipeline import cleanup_job_files, purge_expired_jobs, run_pipeline, sweep_uploads
 from app.services.video_processor import validate_upload_metadata, sanitize_filename, is_video_corrupt, get_video_duration
@@ -130,6 +131,24 @@ async def get_job(job_id: str):
         "message": job.message,
         "result": job.result.model_dump() if job.result else None,
     }
+
+
+@app.get("/api/jobs/{job_id}/export.mp4")
+async def export_job(job_id: str, captions: bool = True):
+    """Render the finished job as an mp4 (original audio ducked under the commentary, optional burned-in captions)."""
+    try:
+        job = job_store.get(job_id)
+    except JobNotFoundError:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.status != "completed" or job.result is None:
+        raise HTTPException(status_code=409, detail="The commentary is not ready yet.")
+    quips = [q.model_dump() for q in job.result.quips]
+    try:
+        path = await render_export(job_id, job.video_path, quips, captions)
+    except ExportError as e:
+        raise HTTPException(status_code=e.status_code, detail=str(e))
+    original = os.path.basename(job.video_path).removeprefix(f"{job_id}_")
+    return FileResponse(path, media_type="video/mp4", filename=f"maneframe_{os.path.splitext(original)[0]}.mp4")
 
 
 @app.websocket("/ws/analyze/{job_id}")
