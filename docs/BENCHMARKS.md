@@ -39,3 +39,36 @@ Notes on this run (written by hand after it; nothing was fixed or tuned during t
 - The 12.0 s extracting-to-analyzing step is identical in all four runs; not investigated.
 - The server for this run listened on port 8001 because port 8000 was held by another uvicorn process that the benchmark did not start.
 - Quality of the commentary and the audio were not judged here; that needs eyes and ears.
+
+## 2026-10-28 20:41
+
+### Environment
+
+- Date: 2026-10-28 20:41
+- Git commit: 316383a
+- Model (GET /v1/models): C:\AI\models\Qwen3.5-9B-Q4_K_M.gguf
+- edge-tts: 7.3.1
+- Python: 3.12.10
+- OS: Windows-11-10.0.26200-SP0
+- Settings (as loaded by this script from backend/.env; the server must have been started from the same folder): LLM_BASE_URL=http://127.0.0.1:8080/v1, LLM_MODEL=local, LLM_TIMEOUT=300.0, LLM_ENABLE_THINKING=False, LLM_MAX_TOKENS=500, LLM_TEMPERATURE=0.8, WINDOW_SECONDS=10.0, FRAMES_PER_WINDOW=6, FRAME_WIDTH=896, MAX_QUIPS_PER_WINDOW=3, MIN_QUIP_GAP_SEC=4.5, TTS_VOICE=en-US-GuyNeural, TTS_RATE=+10%, TTS_ENABLED=True, TTS_TIMEOUT_SECONDS=30.0, TTS_CONCURRENCY=1, TTS_START_STAGGER_SECONDS=0.3, TTS_RETRIES=1, MAX_SHIFT_SEC=2.0, MAX_VIDEO_SECONDS=1800.0
+
+### Results
+
+| Run | Clip (length / size) | Total s | Extract / analyze / synth s | Final status | Quips (total / audio / no audio) | Spoken s | Audio overlaps | LLM calls (incl. retries) / avg s / max s | Avg prompt / completion tokens | Shifting / Dropping / TTS failed |
+|---|---|---|---|---|---|---|---|---|---|---|
+| hoco_40s.mp4 | 40.2 s / 101.7 MB | 250.8 | 14.2 / 228.5 / 8.1 | completed | 6 / 6 / 0 | 22.8 | 0 | 4 / 54.9 / 57.5 | 2950 / 116 | 0 / 0 / 0 |
+| shorter_test.mp4 | 4.8 s / 12.3 MB | 66.1 | 12.0 / 52.1 / 2.0 | completed | 1 / 1 / 0 | 3.2 | 0 | 1 / 52.0 / 52.0 | 2962 / 110 | 0 / 0 / 0 |
+
+Phase seconds come from polling every 2 s (about +/-2 s). Total is wall clock from upload accepted to the first poll that saw `completed`/`error`. Overlap = consecutive audio quips where timestamp + duration_sec exceeds the next timestamp by more than 0.05 s.
+Window, token and Shifting/Dropping/TTS failed columns are from `lionhype_bench.log`; n/a means the job was not found in the log.
+
+Per-window LLM seconds:
+
+- hoco_40s.mp4: 53.9s, 57.5s, 52.5s, 55.5s
+- shorter_test.mp4: 52.0s
+
+Notes on this run (session 16, with the session 15 multi-object JSON fix; nothing was tuned during the run):
+- `LLM_JSON_SCHEMA=true` (the default since session 15; not in the settings list above because the script does not print it). Unusable-reply retries: 0 ("unusable reply" appears 0 times in the backend log). LLM calls equal windows: 4 for hoco_40s, 1 for shorter_test. The 2026-10-28 17:07 run had 3 retries in 9 calls.
+- hoco_40s: 250.8 s versus 298.6 s before (about 6.2x real time versus 7.4x); shorter_test cold: 66.1 s versus 124.3 s. Per-call time is unchanged at about 54 s; the gain is the removed retries. Quips went 7 to 6 (model output varies run to run).
+- hoco2026.MOV and the warm repeat were not run this time. Model: Qwen3.5-9B Q4_K_M, not the 35B-A3B.
+- Quality of the commentary and the audio were not judged here.
