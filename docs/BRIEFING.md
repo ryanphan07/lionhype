@@ -13,11 +13,11 @@ LionHype turns a lion dance video into humorous, time-synced AI commentary with 
 - Honesty rule: no canned LLM text, no fake audio. Failures are shown, not hidden.
 
 ## State (2026-10-28)
-- Implemented and tested (117 backend tests, fresh venv and `npm ci` verified, lint and build clean, 0 npm vulnerabilities): upload validation, job API (`POST /api/upload`, `GET /api/jobs/{id}`, `WS /ws/analyze/{id}`), windowed vision pipeline, TTS with measured durations, server-side overlap scheduling, categorized safe error messages, stale-job lock, startup upload sweep, polling fallback in the browser, time-left estimate.
+- Implemented and tested (130 backend tests, fresh venv and `npm ci` verified, lint and build clean, 0 npm vulnerabilities): upload validation, job API (`POST /api/upload`, `GET /api/jobs/{id}`, `WS /ws/analyze/{id}`), windowed vision pipeline, TTS with measured durations, server-side overlap scheduling, categorized safe error messages, stale-job lock, startup upload sweep, polling fallback in the browser, time-left estimate.
 - Verified live (session 14, docs/BENCHMARKS.md): 3 accepted real jobs completed on the 9B with no audio overlap and no TTS failures; a 40 s clip took 299 s (7 quips, 27.5 s spoken); about 3000 prompt tokens per call; real edge-tts works with edge-tts 7.3.1. Verified on a real server with the LLM down: the job fails in about 4 s with a clear message.
 - **Not verified:** browser behavior (progress, sync, seek, pause, polling), listening to the commentary and audio, any run over 40 s, 35B throughput.
-- **Session 14 findings (docs/BENCHMARKS.md):** about 1 in 3 model calls returns unusable JSON (two objects, or fenced without `quips`) and is retried, which adds about 50 s each; the 12 s extracting-to-analyzing step is unexplained; the 6 GB test clip is over the 2 GB upload cap.
-- Measured cost: about 7x real time on the 9B (40 s clip = 299 s); about 1 in 3 model calls needed the JSON retry. The 327 s test clip was 6 GB and hit the 2 GB upload limit. 10-minute runs untested.
+- **Session 14 findings (docs/BENCHMARKS.md):** about 1 in 3 model calls returned unusable JSON (two objects), addressed in session 15, full-job re-run pending (tolerant parser + `LLM_JSON_SCHEMA`; live: valid quips in 3 of 3 calls, 41.2 s cold and 12.5 s warm vs 54 s baseline); the 12 s extracting-to-analyzing step is unexplained; the 6 GB test clip is over the 2 GB upload cap.
+- Measured cost: about 7x real time on the 9B (40 s clip = 299 s). The 327 s test clip was 6 GB and hit the 2 GB upload limit. 10-minute runs untested.
 
 ## Decisions
 - Made: D1 long clips are a goal; D2 9B for dev, 35B for real runs; timing constants recalibrated to real speech (4.5 s gap, 3 quips and 10 words per window).
@@ -38,7 +38,7 @@ LionHype turns a lion dance video into humorous, time-synced AI commentary with 
 **Results session:** "Here are my live-run numbers: <table>. Tune defaults in config, .env.example and the prompt accordingly, and record the measurements in docs/STATE.md and docs/DECISIONS.md."
 
 ## Resume-claim guardrails (only claim what the repo proves)
-Supported: local multimodal LLM pipeline with motion-based cropping and windowed analysis; WebSocket job progress; server-side scheduling so speech never overlaps, using measured clip durations; honest failure handling (no fabricated output); 117 automated tests. Not yet supported: anything about long-clip performance beyond 40 s, commentary quality metrics, or live demo robustness until the live session is done.
+Supported: local multimodal LLM pipeline with motion-based cropping and windowed analysis; WebSocket job progress; server-side scheduling so speech never overlaps, using measured clip durations; honest failure handling (no fabricated output); 130 automated tests. Not yet supported: anything about long-clip performance beyond 40 s, commentary quality metrics, or live demo robustness until the live session is done.
 
 ## What to share with the planning chat
 Give: `docs/BRIEFING.md` (this file), `docs/OWNER_TODO.md`, `docs/TASKS.md`, `docs/DECISIONS.md`, `docs/HANDOFF.md`. Add `docs/AUDIT.md` only when asking about specific findings (it is long; the top "audit 4" section is enough). Do not share CLAUDE.md, CONVENTIONS.md, STATE.md, README.md or code: the chat does not need them and they go stale; ask Claude Code instead. After each Claude Code session, give the chat the new `docs/HANDOFF.md` (and `docs/BRIEFING.md` if it changed).

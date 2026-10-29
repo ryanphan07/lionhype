@@ -10,15 +10,14 @@ Goal: a credible, honest, demoable resume MVP, shipped fast. Items are tagged wi
 3. TTS fallback: owner unsure; keep edge-tts + text-only fallback until v0.1.0, then consider an offline provider (D3).
 
 ## Done (details in docs/STATE.md, docs/HANDOFF.md, git log)
-Sessions 7, 7b (limits, ETA), 9 (hygiene), 11 (robustness), 12 (safety), 13 (TTS hardening) and 14 (benchmark, docs). Benchmark results are in `docs/BENCHMARKS.md`.
+Sessions 7, 7b (limits, ETA), 9 (hygiene), 11 (robustness), 12 (safety), 13 (TTS hardening) 14 (benchmark, docs) and 15 (multi-object JSON reply: tolerant parser, optional constrained output, 2026-10-28). Benchmark results are in `docs/BENCHMARKS.md`.
 
 ## Before v0.1.0 (owner: see docs/OWNER_TODO.md)
 - [ ] Listen to and watch the commentary in the browser (sync, no overlap, seek, pause, error and no-audio paths).
 - [ ] Record `docs/demo.gif` and a linked video; replace the TODO and `<VIDEO_URL>` in the README Demo section.
-- [ ] Tag `v0.1.0` (the owner pushes). Resume bullet: local multimodal LLM windowed analysis with motion-based crop, time-synced TTS with server-side overlap scheduling, WebSocket job progress, 117 tests, measured 7x real time on a 9B model.
+- [ ] Tag `v0.1.0` (the owner pushes). Resume bullet: local multimodal LLM windowed analysis with motion-based crop, time-synced TTS with server-side overlap scheduling, WebSocket job progress, 130 tests, measured 7x real time on a 9B model.
 
 ## After v0.1.0 (do not start before; ask first)
-- Unusable-JSON retries (about 1 call in 3 in the benchmark): the model emits `{"seen"...}` then a second object; fixing the parser or prompt would cut about 50 s per hit.
 - Long clips (owner goal, 10+ min): D4 failure policy B/C, one 10+ minute run, upload chunking/early size rejection, `seen` summaries across windows (N7).
 - Throughput experiments (N8): `FRAME_WIDTH` 640, `FRAMES_PER_WINDOW` 4, `WINDOW_SECONDS` 20 on 9B and 35B-A3B; optional `-np 2`.
 - Polish: warn when the browser cannot play the format (F13), volume change while ducked, 2-3 Vitest tests for the VideoPlayer queue, show dropped quips as skipped.
