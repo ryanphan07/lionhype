@@ -144,7 +144,7 @@ async def test_tts_unreadable_duration_is_measured_twice_and_logged(audio_dir, f
     monkeypatch.setattr(tts_module, "DURATION_RECHECK_DELAY_SECONDS", 0)
     calls = []
     monkeypatch.setattr(tts_module, "measure_duration", lambda p: calls.append(p))
-    with caplog.at_level("WARNING", logger="lionhype.tts"):
+    with caplog.at_level("WARNING", logger="maneframe.tts"):
         assert await tts_module.generate_audio_clip({"timestamp": 2.0, "text": "hello"}, video_id="job1") is None
     assert len(calls) == 2
     assert "first4=fffb9000" in caplog.text and "file_bytes=400" in caplog.text
@@ -154,7 +154,7 @@ async def test_tts_unreadable_duration_is_measured_twice_and_logged(audio_dir, f
 @pytest.mark.anyio
 async def test_tts_failure_log_has_diagnostics(audio_dir, fake_edge, caplog):
     fake_edge.behavior = "boom"
-    with caplog.at_level("WARNING", logger="lionhype.tts"):
+    with caplog.at_level("WARNING", logger="maneframe.tts"):
         await tts_module.generate_audio_clip({"timestamp": 2.0, "text": "hello"}, video_id="job1")
     assert "RuntimeError" in caplog.text and "text_len=5" in caplog.text
     assert settings.TTS_VOICE in caplog.text and "file_bytes=400" in caplog.text

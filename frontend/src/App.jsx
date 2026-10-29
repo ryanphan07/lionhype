@@ -215,7 +215,7 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>LionHype</h1>
+        <h1>Maneframe</h1>
         <input type="file" accept="video/*" onChange={handleVideoUpload} disabled={inFlight} />
 
         {processingStatus !== 'idle' && (

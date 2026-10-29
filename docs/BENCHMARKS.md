@@ -60,7 +60,7 @@ Notes on this run (written by hand after it; nothing was fixed or tuned during t
 | shorter_test.mp4 | 4.8 s / 12.3 MB | 66.1 | 12.0 / 52.1 / 2.0 | completed | 1 / 1 / 0 | 3.2 | 0 | 1 / 52.0 / 52.0 | 2962 / 110 | 0 / 0 / 0 |
 
 Phase seconds come from polling every 2 s (about +/-2 s). Total is wall clock from upload accepted to the first poll that saw `completed`/`error`. Overlap = consecutive audio quips where timestamp + duration_sec exceeds the next timestamp by more than 0.05 s.
-Window, token and Shifting/Dropping/TTS failed columns are from `lionhype_bench.log`; n/a means the job was not found in the log.
+Window, token and Shifting/Dropping/TTS failed columns are from `maneframe_bench.log`; n/a means the job was not found in the log.
 
 Per-window LLM seconds:
 

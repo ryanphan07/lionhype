@@ -19,7 +19,7 @@ logging.basicConfig(
     level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
-logger = logging.getLogger("lionhype.main")
+logger = logging.getLogger("maneframe.main")
 BUSY_DETAIL = "Another clip is still being processed. Please wait for it to finish."
 
 

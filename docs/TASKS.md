@@ -1,4 +1,4 @@
-# LionHype roadmap (v0.1.0 shipped 2026-10-28)
+# Maneframe roadmap (v0.1.0 shipped 2026-10-28)
 
 Design decisions are in `docs/DECISIONS.md`; what is implemented is in `docs/STATE.md`.
 

@@ -51,7 +51,7 @@ def everywhere_video(tmp_path):
 # ---- crop box -------------------------------------------------------------------------------
 
 def test_crop_box_found_on_moving_subject_and_logged(moving_video, caplog):
-    with caplog.at_level(logging.INFO, logger="lionhype.video"):
+    with caplog.at_level(logging.INFO, logger="maneframe.video"):
         box = vp.compute_crop_box(moving_video, SECONDS)
     assert box is not None
     x0, y0, x1, y1 = box
@@ -259,7 +259,7 @@ async def test_multi_object_reply_needs_no_retry(monkeypatch, prompt_file):
 async def test_unusable_reply_logged_in_full_capped(monkeypatch, prompt_file, caplog):
     long_reply = SEEN[:-1] + ', "pad": "' + "x" * 3000 + '"}'
     use_client(monkeypatch, [long_reply, SEEN])
-    with caplog.at_level(logging.WARNING, logger="lionhype.llm"):
+    with caplog.at_level(logging.WARNING, logger="maneframe.llm"):
         with pytest.raises(llm_module.LLMOutputError):
             await llm_module.analyze_window(FRAMES, 0.0, 3.0)
     first = [r.getMessage() for r in caplog.records if "attempt 1" in r.getMessage()][0]
@@ -295,7 +295,7 @@ async def test_transport_error_propagates_without_retry(monkeypatch, prompt_file
 @pytest.mark.anyio
 async def test_logs_tokens_and_seconds_without_base64(monkeypatch, prompt_file, caplog):
     use_client(monkeypatch, [GOOD])
-    with caplog.at_level(logging.DEBUG, logger="lionhype.llm"):
+    with caplog.at_level(logging.DEBUG, logger="maneframe.llm"):
         await llm_module.analyze_window(FRAMES, 0.0, 3.0, label="window 1/1")
     assert "frames=3" in caplog.text and "prompt_tokens=1234" in caplog.text
     assert "completion_tokens=56" in caplog.text and "seconds=" in caplog.text
@@ -430,7 +430,7 @@ async def test_total_pipeline_time_is_logged(monkeypatch, two_windows, caplog):
         return [q(start + 1.0, "hello there")]
 
     monkeypatch.setattr(llm_module, "analyze_window", fake_analyze)
-    with caplog.at_level(logging.INFO, logger="lionhype.commentary"):
+    with caplog.at_level(logging.INFO, logger="maneframe.commentary"):
         await commentary_module.process_video_commentary("v.mp4", job_id="timed")
     assert "finished in" in caplog.text
 

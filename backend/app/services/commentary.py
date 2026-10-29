@@ -9,7 +9,7 @@ from app.services import llm as llm_service
 from app.services import tts as tts_service
 from app.services import video_processor as video_processor_service
 
-logger = logging.getLogger("lionhype.commentary")
+logger = logging.getLogger("maneframe.commentary")
 
 
 AUDIO_GAP_SEC = 0.3

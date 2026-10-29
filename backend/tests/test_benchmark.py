@@ -6,15 +6,15 @@ benchmark = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(benchmark)
 
 LOG = """\
-2026-10-28 10:00:00,000 INFO lionhype.jobs: Created job aaa111
-2026-10-28 10:00:05,000 INFO lionhype.llm: LLM window 1/2: frames=6 prompt_tokens=3248 completion_tokens=120 seconds=44.7
-2026-10-28 10:00:50,000 INFO lionhype.llm: LLM window 2/2: frames=6 prompt_tokens=3300 completion_tokens=? seconds=20.0
-2026-10-28 10:01:10,000 INFO lionhype.commentary: Shifting quip from t=5.00 to t=6.00 to avoid audio overlap
-2026-10-28 10:01:11,000 WARNING lionhype.commentary: Dropping quip at t=9.00: would need a 3.00s shift
-2026-10-28 10:01:12,000 WARNING lionhype.commentary: TTS failed for t=2.00: boom
-2026-10-28 10:02:00,000 INFO lionhype.jobs: Created job bbb222
-2026-10-28 10:02:05,000 INFO lionhype.llm: LLM window 1/1: frames=6 prompt_tokens=3000 completion_tokens=90 seconds=10.5
-2026-10-28 10:02:06,000 INFO lionhype.commentary: Shifting quip from t=1.00 to t=1.50 to avoid audio overlap
+2026-10-28 10:00:00,000 INFO maneframe.jobs: Created job aaa111
+2026-10-28 10:00:05,000 INFO maneframe.llm: LLM window 1/2: frames=6 prompt_tokens=3248 completion_tokens=120 seconds=44.7
+2026-10-28 10:00:50,000 INFO maneframe.llm: LLM window 2/2: frames=6 prompt_tokens=3300 completion_tokens=? seconds=20.0
+2026-10-28 10:01:10,000 INFO maneframe.commentary: Shifting quip from t=5.00 to t=6.00 to avoid audio overlap
+2026-10-28 10:01:11,000 WARNING maneframe.commentary: Dropping quip at t=9.00: would need a 3.00s shift
+2026-10-28 10:01:12,000 WARNING maneframe.commentary: TTS failed for t=2.00: boom
+2026-10-28 10:02:00,000 INFO maneframe.jobs: Created job bbb222
+2026-10-28 10:02:05,000 INFO maneframe.llm: LLM window 1/1: frames=6 prompt_tokens=3000 completion_tokens=90 seconds=10.5
+2026-10-28 10:02:06,000 INFO maneframe.commentary: Shifting quip from t=1.00 to t=1.50 to avoid audio overlap
 """
 
 

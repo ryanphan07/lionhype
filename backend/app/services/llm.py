@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from app.config import settings
 
-logger = logging.getLogger("lionhype.llm")
+logger = logging.getLogger("maneframe.llm")
 
 try:
     from openai import AsyncOpenAI

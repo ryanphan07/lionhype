@@ -10,7 +10,7 @@ from app.services.commentary import process_video_commentary
 from app.services.llm import LLMOutputError
 from app.services.jobs import job_store
 
-logger = logging.getLogger("lionhype.pipeline")
+logger = logging.getLogger("maneframe.pipeline")
 
 
 GENERIC_FAILURE = "Commentary generation failed"

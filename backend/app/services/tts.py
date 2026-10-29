@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 
 from app.config import settings
 
-logger = logging.getLogger("lionhype.tts")
+logger = logging.getLogger("maneframe.tts")
 
 try:
     from edge_tts import Communicate

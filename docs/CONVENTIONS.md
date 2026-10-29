@@ -1,7 +1,7 @@
 # Project Conventions
 
 ## Project context
-LionHype is a local-first app that turns lion dance videos into humorous, time-synced AI commentary with TTS audio. FastAPI backend (OpenCV frames, OpenAI-compatible multimodal LLM, edge-tts) + React/Vite frontend with WebSocket progress.
+Maneframe is a local-first app that turns lion dance videos into humorous, time-synced AI commentary with TTS audio. FastAPI backend (OpenCV frames, OpenAI-compatible multimodal LLM, edge-tts) + React/Vite frontend with WebSocket progress.
 
 Goal: a credible, honest, demoable MVP: upload a clip, see progress, get commentary with non-overlapping audio, run locally in a few commands. Short clips (up to about 60 s) are the supported demo. Longer clips up to `MAX_VIDEO_SECONDS` (1800) and `MAX_UPLOAD_MB` (2048) are allowed but slow and untested; see docs/DECISIONS.md D1. Planned work is in `docs/TASKS.md`.
 

@@ -11,7 +11,7 @@ import numpy as np
 
 from app.config import settings
 
-logger = logging.getLogger("lionhype.video")
+logger = logging.getLogger("maneframe.video")
 
 ALLOWED_EXTENSIONS = {".mp4", ".mov", ".avi"}
 

@@ -1,4 +1,4 @@
-# LionHype: current state (2026-10-28)
+# Maneframe: current state (2026-10-28)
 
 What exists today. Verified means checked by a test or by a run; untested means written but never exercised. Next work: `docs/TASKS.md`.
 

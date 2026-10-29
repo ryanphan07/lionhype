@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from app.config import settings
 from app.schemas.events import CommentaryResponse
 
-logger = logging.getLogger("lionhype.jobs")
+logger = logging.getLogger("maneframe.jobs")
 
 PHASES = ("uploading", "extracting", "analyzing", "synthesizing", "completed", "error")
 TERMINAL = {"completed", "error"}
