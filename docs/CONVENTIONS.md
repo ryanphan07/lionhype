@@ -3,7 +3,7 @@
 ## Project context
 Maneframe is a local-first app that turns lion dance videos into humorous, time-synced AI commentary with TTS audio. FastAPI backend (OpenCV frames, OpenAI-compatible multimodal LLM, edge-tts) + React/Vite frontend with WebSocket progress.
 
-Goal: a credible, honest, demoable MVP: upload a clip, see progress, get commentary with non-overlapping audio, run locally in a few commands. Short clips (up to about 60 s) are the supported demo. Longer clips up to `MAX_VIDEO_SECONDS` (1800) and `MAX_UPLOAD_MB` (2048) are allowed but slow and untested; see docs/DECISIONS.md D1. Planned work is in `docs/TASKS.md`.
+Goal: a better product for real users: lion dance teams turning performance clips into shareable posts. Upload a clip, see progress, get commentary with non-overlapping audio, run locally in a few commands; next, export a finished mp4. Clips up to `MAX_VIDEO_SECONDS` (1800) and `MAX_UPLOAD_MB` (2048) are allowed but slow (about 6x real time on the 9B model); see docs/DECISIONS.md D1. Planned work is in `docs/TASKS.md`.
 
 ## Environment
 - Windows + PowerShell. Native run; there are no Docker files.

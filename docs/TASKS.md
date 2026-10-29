@@ -11,15 +11,22 @@ Design decisions are in `docs/DECISIONS.md`; what is implemented is in `docs/STA
 - Limits as settings, ETA in progress messages, safety and robustness fixes.
 - Benchmark script and results (`docs/BENCHMARKS.md`), browser playback check, demo GIF and video.
 
-## Next (v0.1.1)
-- Warn in the UI when the browser cannot play the uploaded format (`.avi`, some `.mov`).
-- Throughput experiments on the 9B and 35B-A3B models: `FRAME_WIDTH` 640, `FRAMES_PER_WINDOW` 4, `WINDOW_SECONDS` 20, optionally `llama-server -np 2`.
-- A few Vitest tests for the VideoPlayer queue.
-- Show dropped quips as skipped; keep the volume setting while a clip ducks the video.
+## Direction
+The goal is a better product for real users: lion dance teams turning performance clips into shareable posts. Honesty rules stay: no canned LLM text, no fake audio.
 
-## Later
-- Long clips (10+ minutes): skip a failed window after one retry and report the gap (D4 option B), progressive results (D4 option C), early size rejection, a one-line summary of earlier windows to avoid repeats.
-- Offline TTS provider (for example Piper) behind a `TTS_PROVIDER` setting (D3).
+## Phase 1: shareable output and commentary quality
+- mp4 export: the video with the commentary audio mixed in and captions burned in.
+- Commentary quality: lion dance domain vocabulary in the prompt, few-shot examples, `seen` continuity across windows, a style option, and a small eval set to compare prompts and models.
+
+## Phase 2: speed and robustness
+- 9B vs 35B-A3B throughput table (`FRAME_WIDTH` 640, `FRAMES_PER_WINDOW` 4, `WINDOW_SECONDS` 20, optionally `llama-server -np 2`).
+- Sequential crop sampling instead of seeking.
+- Progressive results (D4 option C).
+- HEVC/.MOV transcode so the browser can play more phone footage.
+- Smaller items: warn in the UI when the browser cannot play the format; Vitest tests for the VideoPlayer queue; show dropped quips as skipped; keep the volume setting while a clip ducks the video; offline TTS provider behind `TTS_PROVIDER` (D3).
+
+## Phase 3: distribution (undecided)
+Local packaging versus a hosted service.
 
 ## Out of scope
 Auth, persistence or a database, a multi-user queue, S3 or presigned uploads, Docker, deployment, an MCP server, an analytics dashboard.
