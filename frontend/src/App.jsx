@@ -26,6 +26,23 @@ const errorDetail = (error, fallback) => {
   return typeof detail === 'string' && detail ? detail : fallback;
 };
 
+// A blob response body holds the server's JSON error when the request failed.
+const exportErrorMessage = async (error) => {
+  const body = error?.response?.data;
+  if (body instanceof Blob) {
+    try {
+      const detail = JSON.parse(await body.text()).detail;
+      if (typeof detail === 'string' && detail) return detail;
+    } catch {
+      // not JSON: fall through to the generic message
+    }
+    return 'Failed to render the video.';
+  }
+  return errorDetail(error, 'Failed to render the video.');
+};
+
+const exportFileName = (originalName) => `maneframe_${originalName.replace(/\.[^.]*$/, '')}.mp4`;
+
 function App() {
   const [commentaryQuips, setCommentaryQuips] = useState([]);
   const [audioAvailable, setAudioAvailable] = useState(true);
@@ -35,6 +52,9 @@ function App() {
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [exportJob, setExportJob] = useState(null);
+  const [captions, setCaptions] = useState(true);
+  const [rendering, setRendering] = useState(false);
 
   const socketRef = useRef(null);
   const reconnectTimerRef = useRef(null);
@@ -191,6 +211,7 @@ function App() {
     setErrorMessage('');
     setStatusMessage('');
     setProgress(0);
+    setExportJob(null);
     setProcessingStatus('uploading');
 
     const formData = new FormData();
@@ -200,6 +221,7 @@ function App() {
       const { data } = await axios.post(`${API_BASE}/api/upload`, formData);
       const jobId = data.job_id;
       jobIdRef.current = jobId;
+      setExportJob({ jobId, fileName: exportFileName(file.name) });
 
       const url = URL.createObjectURL(file);
       if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
@@ -213,6 +235,29 @@ function App() {
       fail(errorDetail(error, 'Failed to upload video.'));
     } finally {
       input.value = '';
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!exportJob || rendering) return;
+    setRendering(true);
+    try {
+      const { data } = await axios.get(`${API_BASE}/api/jobs/${exportJob.jobId}/export.mp4`, {
+        params: { captions: captions ? 1 : 0 },
+        responseType: 'blob',
+      });
+      const url = URL.createObjectURL(data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = exportJob.fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (error) {
+      toast.error(await exportErrorMessage(error), { position: 'top-right' });
+    } finally {
+      setRendering(false);
     }
   };
 
@@ -253,6 +298,24 @@ function App() {
         {errorMessage && (
           <div role="alert" style={{ margin: '1rem 0', padding: '0.5rem 1rem', background: '#fdecea', border: '1px solid #f5c2c0', borderRadius: '4px', color: '#8a1c17' }}>
             {errorMessage}
+          </div>
+        )}
+
+        {processingStatus === 'completed' && exportJob && (
+          <div style={{ margin: '1rem 0' }}>
+            <button type="button" onClick={handleDownload} disabled={rendering}>
+              {rendering ? 'Rendering video…' : 'Download video'}
+            </button>
+            <label style={{ marginLeft: '1rem' }}>
+              <input
+                type="checkbox"
+                checked={captions}
+                onChange={(e) => setCaptions(e.target.checked)}
+                disabled={rendering}
+              />{' '}
+              Captions
+            </label>
+            {rendering && <div><small>Rendering can take a while for long clips.</small></div>}
           </div>
         )}
 
