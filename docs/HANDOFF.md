@@ -1,28 +1,29 @@
-# Handoff: session 15 multi-object JSON reply (2026-10-28)
+# Handoff: session 16 (v0.1.0 NOT tagged yet: demo assets pending)
 
 ## 1. Done
-- backend/app/services/llm.py: `parse_model_objects` collects every top-level JSON object (think/fences stripped, prose skipped); `extract_quips` uses the first object with a `quips` list, else bare `{"t","text"}` objects (the prompt's keys); seen-only still raises, one retry kept. Unusable replies are logged in full (2000-char cap) at WARNING.
-- `LLM_JSON_SCHEMA` (config.py, .env.example): sends `response_format` json_schema (seen + quips[t,text], maxItems = MAX_QUIPS_PER_WINDOW). Default true.
-- frontend/src/App.jsx: no stale status message after "error".
-- tests/test_vision.py: 13 new tests (130 total). Docs: README, STATE, TASKS, BRIEFING, CONVENTIONS, .env.example.
-- Commits: parser, frontend, schema feature, then schema default + docs.
+- CLAUDE.md: scope line now says "items in docs/TASKS.md 'Before v0.1.0'" (only change).
+- docs/BENCHMARKS.md: new 2026-10-28 20:41 section (old kept), notes LLM_JSON_SCHEMA=true and 0 retries.
+- README.md: new benchmark table and numbers (251 s, ~6x), browser-check line, "(no audio)" troubleshooting entry.
+- docs/AUDIT.md (M1-M4 FIXED), OWNER_TODO, STATE (maturity, new verified section), TASKS, BRIEFING refreshed.
 
 ## 2. Decisions and deviations
-- Live check (hoco_40s.mp4 from Downloads, first window, 6 frames, 2917 prompt tokens): llama-server accepted the schema; valid quips every time. Schema on: 41.2 s cold, 12.5 s warm; off: 17.5 s warm. Not slower, so default true (the ~54 s baseline included cold cache).
-- Kept `parse_model_json` (first object) for compatibility; the pipeline no longer uses it.
-- Wrote files with LF to match the repo; `pytest` must run from backend/venv (system Python fails test_measure_duration_real_mp3, also on the earlier commit).
+- Step 3 (demo.mp4/demo.gif) NOT done: the prompt's recording path was a placeholder and you never gave one. The only recent captures are terminal recordings (Vite console), not the app. ffmpeg is installed but not on this shell's PATH:
+  C:\Users\ryanp\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-9.0.2-full_build\bin
+- README Demo section still has the TODO and <VIDEO_URL>; the Status line still says the GIF is not recorded. Tag v0.1.0 held so the tag includes the demo.
+- Step 5 skipped: parse_model_json is used by tests/test_audio.py and tests/test_vision.py.
+- Browser check recorded as "no problems seen" per your answer.
+- First benchmark attempt hit a down llama-server; that section was discarded, not committed. Benchmark ran hoco_40s and shorter_test only (no warm repeat, no hoco2026.MOV). Earlier uvicorn stopped; benchmark log in %TEMP%\lionhype_bench.log.
+- TASKS "Before v0.1.0": demo and tag items left open; the browser-check item was removed (done).
 
 ## 3. Results
-- pytest 130 passed (venv); eslint clean; vite build OK.
+pytest 130 passed; eslint clean; vite build OK. Benchmark: hoco_40s 250.8 s, 6 quips, 0 retries; shorter_test 66.1 s.
 
-## 4. Not verified, needs manual testing
-- A full browser/benchmark job with the fix (window 2/4 of hoco 40 s is the failing case); only one window was run live.
-- Other servers/models may reject `response_format`: then set LLM_JSON_SCHEMA=false.
-- Everything from session 14 (sync, seek, audio, GIF).
+## 4. Not verified
+- Demo assets. Polling fallback, error paths, commentary quality by ear.
 
-## 5. Open issues and risks
-- llm.py `_call`: a server HTTP 400 on response_format would surface as a model error, with no auto-fallback.
-- 12 s extracting step unexplained; long clips and 35B unmeasured.
+## 5. Open issues
+- README.md Demo section and Status line (line 5); docs/TASKS.md Before v0.1.0.
 
 ## 6. Suggested next session
-Re-run `backend/scripts/benchmark.py` on hoco_40s, then owner browser check, GIF, tag v0.1.0.
+Finish v0.1.0: give the app recording path; make docs/demo.mp4 (720p, crf 28, AAC, <=10 MB) and docs/demo.gif (10-15 s, 640 px, 10 fps, <=8 MB); update README Demo/Status; `git tag -a v0.1.0 -m "LionHype v0.1.0"`.
+Then v0.1.1: HTTP 400 fallback for response_format, sequential crop sampling (12 s extract), 35B and long-clip measurements.
