@@ -222,7 +222,7 @@ function App() {
           <div style={{ margin: '1rem 0', maxWidth: '360px' }}>
             <div style={{ marginBottom: '0.5rem' }}>
               <strong>{PHASE_LABELS[processingStatus] || processingStatus}</strong>
-              {statusMessage && <span> – {statusMessage}</span>}
+              {statusMessage && processingStatus !== 'error' && <span> – {statusMessage}</span>}
             </div>
             <div
               role="progressbar"
