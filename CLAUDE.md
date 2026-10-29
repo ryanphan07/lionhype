@@ -11,7 +11,7 @@
 * Follow CONVENTIONS.md. Never read or edit .history/, node\_modules/, venv/, uploads/.
 * Be concise: no recaps, never paste large files back, plan in 10 lines or fewer and then proceed.
 * Run tests before each commit (commands are in CONVENTIONS.md). One logical change per commit. Never push.
-* Scope freeze until v0.1.0 ships: no new audits, no long-clip work, no new features. Only ship-blocking fixes and the items in docs/TASKS.md Session 12 and docs/OWNER\_TODO.md
+* Scope freeze until v0.1.0 ships: no new audits, no long-clip work, no new features. Only ship-blocking fixes and the items in docs/TASKS.md 'Before v0.1.0' and docs/OWNER\_TODO.md
 
 **Workflow:** the owner plans in a separate chat that cannot see this repo, then runs you one scoped session at a time. Session prompts may contain wrong file names or assumptions. Verify against the code and adapt minimally. Stop and ask only if the fix would change a public API shape or delete files the prompt didn't mention. Record every deviation in the handoff.
 
