@@ -45,7 +45,7 @@ uvicorn app.main:app --port 8000
 # 3. Frontend (another terminal)
 cd frontend; npm install; npm run dev     # http://localhost:5173
 ```
-Open http://localhost:5173, choose a clip (`.mp4`, `.mov`, `.avi`; at most 30 min and 2 GB by default, see `MAX_VIDEO_SECONDS`/`MAX_UPLOAD_MB`), wait for the progress bar, press play. Expect minutes of processing: on Qwen3.5-9B a 40 s clip took about 5 minutes (see Benchmarks). Short clips are the supported demo; 40 s is the longest clip measured.
+Open http://localhost:5173, choose a clip (`.mp4`, `.mov`, `.avi`; at most 30 min and 2 GB by default, see `MAX_VIDEO_SECONDS`/`MAX_UPLOAD_MB`), wait for the progress bar, press play. Expect minutes of processing: on Qwen3.5-9B a 40 s clip took about 4 minutes (see Benchmarks). Short clips are the supported demo; 40 s is the longest clip measured.
 
 ## API
 
@@ -77,7 +77,7 @@ The system prompt is `backend/app/prompts/commentary_system.txt` (restart the ba
 pytest backend/tests -q          # 130 tests: LLM and edge-tts faked, real tiny videos and a real mp3 for the rest
 cd frontend; npm run lint; npm run build
 ```
-Not covered by automated tests: the real model, the real TTS service, browser playback sync.
+Not covered by automated tests: the real model, the real TTS service, browser playback sync (checked by hand, see How it was tested).
 
 ## Benchmarks
 
@@ -85,10 +85,10 @@ Measured with `backend/scripts/benchmark.py` on Windows 11, Qwen3.5-9B Q4_K_M vi
 
 | Clip | Length | Processing | Quips (with audio) | Spoken | Overlaps | Shifted / dropped / TTS failed |
 |---|---|---|---|---|---|---|
-| shorter_test.mp4, cold | 4.8 s | 124 s | 1 (1) | 4.0 s | 0 | 0 / 0 / 0 |
-| shorter_test.mp4, warm (prompt cache) | 4.8 s | 50 s | 1 (1) | 3.1 s | 0 | 0 / 0 / 0 |
-| hoco_40s.mp4 | 40.2 s | 299 s | 7 (7) | 27.5 s | 0 | 0 / 0 / 0 |
-| hoco2026.MOV | 327 s | rejected (6 GB > 2 GB upload limit) | - | - | - | - |
+| shorter_test.mp4 | 4.8 s | 66 s | 1 (1) | 3.2 s | 0 | 0 / 0 / 0 |
+| hoco_40s.mp4 | 40.2 s | 251 s | 6 (6) | 22.8 s | 0 | 0 / 0 / 0 |
+
+Run on 2026-10-28 with `LLM_JSON_SCHEMA=true` (the default): 0 unusable-reply retries in 5 model calls, about 54 s per call. The earlier run without the fix needed 3 retries in 9 calls (40 s clip: 299 s). hoco2026.MOV (327 s, 6 GB) was rejected by the default 2 GB upload limit in the earlier run and was not re-run.
 
 ## Demo
 
@@ -97,18 +97,20 @@ TODO: record `docs/demo.gif` and add it here: `![demo](docs/demo.gif)`. Full vid
 ## How it was tested
 - 130 automated tests (LLM and edge-tts faked; real tiny videos and a real mp3), frontend lint and build.
 - One scripted end-to-end run on 3 real clips plus a repeat (table above) against a real llama-server and the real edge-tts service: all 4 accepted jobs finished, with no overlapping audio and no TTS failures in the timeline.
-- Untested: commentary quality (judged by ear and eye only), browser playback sync, seek and pause, clips longer than 40 s, the 35B-A3B model, other machines.
+- Browser playback (sync, seek, pause) checked by the owner on 2026-10-28 with hoco_40s.mp4 and the final fix: no problems seen.
+- Untested: commentary quality (judged by ear and eye only), clips longer than 40 s, the 35B-A3B model, other machines.
 
 ## Troubleshooting
 - Progress stops and the page says "Live updates lost": on Windows, selecting text in the backend console window (QuickEdit) pauses the server until you press Enter. Press Enter, or turn QuickEdit off in the console properties.
 - Job fails with "The AI model rejected the request": llama-server returned an HTTP error (the status is in the backend log); check its console, the model and mmproj files, and `-c`.
 - Job fails with "The AI model is not reachable": start llama-server (see Quickstart) and check `LLM_BASE_URL`.
 - No audio, "audio unavailable" notice: edge-tts needs internet and `edge-tts>=7.3.1`. Run `python backend/scripts/tts_check.py` (venv active) to synthesize 6 test lines through the app's own TTS code with your current settings; it prints OK/fail with byte sizes, and failures are logged with the exception class, text length, voice, rate and file size. Clips are synthesized one at a time by default (`TTS_CONCURRENCY=1`); "No audio was received" and dropped connections are retried once.
+- Every line shows "(no audio)" and the log says "duration unreadable": uvicorn is not running from `backend/venv`. Activate it (prompt shows `(venv)`) and restart.
 
 ## Known limitations
 - Single user, in-memory jobs, no auth, one job at a time (a second upload gets 409; the LLM server is single-slot). Starting the backend deletes leftover job files (`<job id>_<name>` videos, `<job id>` audio folders) in `uploads/`; other files there are left alone.
-- Longest clip measured: 40 s (about 5 min of processing). Longer clips, up to `MAX_VIDEO_SECONDS`, are allowed but untested; a 327 s, 6 GB clip was rejected by the default 2 GB upload limit.
-- Processing is slow on local hardware: 40 s of video took 299 s (about 7x real time) on Qwen3.5-9B, 54 s per model call on average. One failed window fails the whole job; jobs are lost on restart. The 35B-A3B model is unmeasured.
+- Longest clip measured: 40 s (about 4 min of processing). Longer clips, up to `MAX_VIDEO_SECONDS`, are allowed but untested; a 327 s, 6 GB clip was rejected by the default 2 GB upload limit.
+- Processing is slow on local hardware: 40 s of video took 251 s (about 6x real time) on Qwen3.5-9B, 54 s per model call on average. One failed window fails the whole job; jobs are lost on restart. The 35B-A3B model is unmeasured.
 - Speech needs internet (edge-tts). A transient TTS failure is retried once; if edge-tts stays unreachable the app shows the commentary as text with a notice.
 - `.avi` and some `.mov` files are accepted by the server but may not play in the browser.
 - Runs natively on Windows only; there are no Docker files.
