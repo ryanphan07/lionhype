@@ -435,6 +435,52 @@ async def test_total_pipeline_time_is_logged(monkeypatch, two_windows, caplog):
     assert "finished in" in caplog.text
 
 
+def http_error(status):
+    import httpx
+    import openai
+
+    response = httpx.Response(status, request=httpx.Request("POST", "http://llm/v1/chat/completions"))
+    return openai.APIStatusError("boom", response=response, body=None)
+
+
+@pytest.mark.anyio
+async def test_http_400_with_schema_retries_once_without_response_format(monkeypatch, prompt_file, caplog):
+    monkeypatch.setattr(settings, "LLM_JSON_SCHEMA", True)
+    client = use_client(monkeypatch, [http_error(400), GOOD])
+    with caplog.at_level(logging.WARNING, logger="maneframe.llm"):
+        quips = await llm_module.analyze_window(FRAMES, 0.0, 3.0)
+    assert len(quips) == 2 and len(client.calls) == 2
+    assert "response_format" in client.calls[0] and "response_format" not in client.calls[1]
+    assert any("HTTP 400" in r.getMessage() and r.levelno == logging.WARNING for r in caplog.records)
+
+
+@pytest.mark.anyio
+async def test_http_400_without_schema_is_not_retried(monkeypatch, prompt_file):
+    monkeypatch.setattr(settings, "LLM_JSON_SCHEMA", False)
+    client = use_client(monkeypatch, [http_error(400), GOOD])
+    with pytest.raises(Exception) as info:
+        await llm_module.analyze_window(FRAMES, 0.0, 3.0)
+    assert info.value.status_code == 400 and len(client.calls) == 1
+
+
+@pytest.mark.anyio
+async def test_other_http_errors_with_schema_are_not_retried(monkeypatch, prompt_file):
+    monkeypatch.setattr(settings, "LLM_JSON_SCHEMA", True)
+    client = use_client(monkeypatch, [http_error(500), GOOD])
+    with pytest.raises(Exception) as info:
+        await llm_module.analyze_window(FRAMES, 0.0, 3.0)
+    assert info.value.status_code == 500 and len(client.calls) == 1
+
+
+@pytest.mark.anyio
+async def test_second_400_propagates(monkeypatch, prompt_file):
+    monkeypatch.setattr(settings, "LLM_JSON_SCHEMA", True)
+    client = use_client(monkeypatch, [http_error(400), http_error(400)])
+    with pytest.raises(Exception) as info:
+        await llm_module.analyze_window(FRAMES, 0.0, 3.0)
+    assert info.value.status_code == 400 and len(client.calls) == 2
+
+
 def test_llm_client_does_not_retry_on_its_own():
     assert llm_module.llm_client.max_retries == 0
 

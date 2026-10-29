@@ -162,17 +162,23 @@ def build_messages(
 
 async def _call(messages: List[Dict[str, Any]], frame_count: int, label: str) -> str:
     started = time.monotonic()
-    kwargs: Dict[str, Any] = {}
+    kwargs: Dict[str, Any] = {
+        "model": settings.LLM_MODEL,
+        "messages": messages,
+        "temperature": settings.LLM_TEMPERATURE,
+        "max_tokens": settings.LLM_MAX_TOKENS,
+        "extra_body": {"chat_template_kwargs": {"enable_thinking": settings.LLM_ENABLE_THINKING}},
+    }
     if settings.LLM_JSON_SCHEMA:
         kwargs["response_format"] = response_format()
-    response = await llm_client.chat.completions.create(
-        model=settings.LLM_MODEL,
-        messages=messages,
-        temperature=settings.LLM_TEMPERATURE,
-        max_tokens=settings.LLM_MAX_TOKENS,
-        extra_body={"chat_template_kwargs": {"enable_thinking": settings.LLM_ENABLE_THINKING}},
-        **kwargs,
-    )
+    try:
+        response = await llm_client.chat.completions.create(**kwargs)
+    except Exception as exc:
+        if "response_format" not in kwargs or getattr(exc, "status_code", None) != 400:
+            raise
+        logger.warning("%s: server rejected response_format with HTTP 400; retrying once without it", label)
+        del kwargs["response_format"]
+        response = await llm_client.chat.completions.create(**kwargs)
     usage = getattr(response, "usage", None)
     logger.info(
         "LLM %s: frames=%d prompt_tokens=%s completion_tokens=%s seconds=%.1f",
