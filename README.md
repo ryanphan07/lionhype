@@ -1,8 +1,8 @@
 # Maneframe: AI lion dance commentator
 
-Upload a short lion dance video and get humorous, time-synced play-by-play commentary, read aloud while the video plays. A local vision LLM watches the footage, edge-tts speaks the lines, and the server schedules them so they never overlap.
+Upload a lion dance performance clip and get humorous, time-synced play-by-play commentary, read aloud while the video plays. A local vision LLM watches the footage, edge-tts speaks the lines, and the server schedules them so they never overlap.
 
-Status: v0.1.0, a working local prototype, not a product. It runs end to end with no fake output: if the model or TTS fails, you see an error or a "no audio" notice, never placeholder content.
+Status: v0.1.0, a working local prototype that is being developed into a tool for lion dance teams who turn performance clips into shareable posts (roadmap: `docs/TASKS.md`). It runs end to end with no fake output: if the model or TTS fails, you see an error or a "no audio" notice, never placeholder content.
 
 ![demo](docs/demo.gif)
 
@@ -27,7 +27,7 @@ Key design points:
 - Motion-based crop: wide stage shots are cropped once per video to where the bright, moving performers are, so the model sees them at useful resolution.
 - Windowed analysis: one LLM call per 10 s window, passing the last two quips to avoid repeats.
 - Server-side scheduling: an audio line never starts before the previous one ends plus 0.3 s. It is shifted up to 2 s later, otherwise dropped. Lines without audio are still shown.
-- Honest failure: a failed LLM window fails the job; a failed TTS clip only removes that line's audio.
+- Honest failure: a window the model fails on (after one retry) is skipped and reported ("skipped n of m parts" with the time ranges), never filled with invented text; if every window fails the job errors. A failed TTS clip only removes that line's audio.
 
 ## Requirements
 - Windows (developed natively on Windows 11), Python 3.12, Node 20+ (tested on 24).
@@ -78,7 +78,7 @@ The system prompt is `backend/app/prompts/commentary_system.txt` (restart the ba
 ## Tests
 
 ```powershell
-pytest backend/tests -q          # 130 tests: LLM and edge-tts faked, real tiny videos and a real mp3 for the rest
+pytest backend/tests -q          # 138 tests: LLM and edge-tts faked, real tiny videos and a real mp3 for the rest
 cd frontend; npm run lint; npm run build
 ```
 Not covered by automated tests: the real model, the real TTS service, browser playback sync (checked by hand, see How it was tested).
@@ -95,7 +95,7 @@ Measured with `backend/scripts/benchmark.py` on Windows 11, Qwen3.5-9B Q4_K_M vi
 Run on 2026-10-28 with `LLM_JSON_SCHEMA=true` (the default): 0 unusable-reply retries in 5 model calls, about 54 s per call. The earlier run without the fix needed 3 retries in 9 calls (40 s clip: 299 s). hoco2026.MOV (327 s, 6 GB) was rejected by the default 2 GB upload limit in the earlier run and was not re-run.
 
 ## How it was tested
-- 130 automated tests (LLM and edge-tts faked; real tiny videos and a real mp3), frontend lint and build.
+- 138 automated tests (LLM and edge-tts faked; real tiny videos and a real mp3), frontend lint and build.
 - One scripted end-to-end run on 3 real clips plus a repeat (table above) against a real llama-server and the real edge-tts service: all 4 accepted jobs finished, with no overlapping audio and no TTS failures in the timeline.
 - Browser playback (sync, seek, pause) checked by hand on 2026-10-28 with hoco_40s.mp4 and the final fix: no problems seen.
 - Untested: commentary quality (judged by ear and eye only), clips longer than 40 s, the 35B-A3B model, other machines.
@@ -110,7 +110,7 @@ Run on 2026-10-28 with `LLM_JSON_SCHEMA=true` (the default): 0 unusable-reply re
 ## Known limitations
 - Single user, in-memory jobs, no auth, one job at a time (a second upload gets 409; the LLM server is single-slot). Starting the backend deletes leftover job files (`<job id>_<name>` videos, `<job id>` audio folders) in `uploads/`; other files there are left alone.
 - Longest clip measured: 40 s (about 4 min of processing). Longer clips, up to `MAX_VIDEO_SECONDS`, are allowed but untested; a 327 s, 6 GB clip was rejected by the default 2 GB upload limit.
-- Processing is slow on local hardware: 40 s of video took 251 s (about 6x real time) on Qwen3.5-9B, 54 s per model call on average. One failed window fails the whole job; jobs are lost on restart. The 35B-A3B model is unmeasured.
+- Processing is slow on local hardware: 40 s of video took 251 s (about 6x real time) on Qwen3.5-9B, 54 s per model call on average. Skipped windows leave gaps without commentary; jobs are lost on restart. The 35B-A3B model is unmeasured.
 - Speech needs internet (edge-tts). A transient TTS failure is retried once; if edge-tts stays unreachable the app shows the commentary as text with a notice.
 - `.avi` and some `.mov` files are accepted by the server but may not play in the browser.
 - Runs natively on Windows only; there are no Docker files.
