@@ -21,3 +21,10 @@ repomix-output.xml
 spike_frames/
 .history/
 **/.history/
+
+# Internal / local-only
+CLAUDE.md
+docs/BRIEFING.md
+docs/OWNER_TODO.md
+docs/HANDOFF.md
+docs/AUDIT.md
